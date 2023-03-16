@@ -5,7 +5,7 @@ const db = new Database(path.join(__dirname, 'bench.db'))
 
 const key = Buffer.from('key')
 
-db.put(key, Buffer.from('value'))
+db.put(key, Buffer.alloc(4 * 1024, 'value'))
 
 console.time('db.get(key)')
 
