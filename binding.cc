@@ -50,6 +50,8 @@ rocksdb_native_open (js_env_t *env, js_callback_info_t *info) {
 
   Status status = DB::Open(options, name, &handle->db);
 
+  delete[] name;
+
   if (!status.ok()) {
     rocksdb_native_throw(env, status);
     return nullptr;
