@@ -1,0 +1,4 @@
+[submodule "vendor/rocksdb"]
+	path = vendor/rocksdb
+	url = git@github.com:facebook/rocksdb.git
+	shallow = true
