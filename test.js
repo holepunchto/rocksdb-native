@@ -1,32 +1,33 @@
 const test = require('brittle')
 const Database = require('.')
 
-test('open + close', (t) => {
+test('open + close', async (t) => {
   const db = new Database('test/fixtures/rocks.db')
+  await db.ready()
 
-  db.close()
+  await db.close()
 
   t.pass()
 })
 
-test('put + get', (t) => {
+test('put + get', async (t) => {
   const db = new Database('test/fixtures/rocks.db')
+  await db.ready()
+  t.teardown(() => db.close())
 
-  db.put(Buffer.from('key'), Buffer.from('value'))
+  await db.put(Buffer.from('key'), Buffer.from('value'))
 
-  t.alike(db.get(Buffer.from('key')), Buffer.from('value'))
-
-  db.close()
+  t.alike(await db.get(Buffer.from('key')), Buffer.from('value'))
 })
 
-test('put + delete + get', (t) => {
+test('put + delete + get', async (t) => {
   const db = new Database('test/fixtures/rocks.db')
+  await db.ready()
+  t.teardown(() => db.close())
 
-  db.put(Buffer.from('key'), Buffer.from('value'))
+  await db.put(Buffer.from('key'), Buffer.from('value'))
 
-  db.delete(Buffer.from('key'))
+  await db.delete(Buffer.from('key'))
 
-  t.absent(db.get(Buffer.from('key')))
-
-  db.close()
+  t.absent(await db.get(Buffer.from('key')))
 })
