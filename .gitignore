@@ -1,5 +1,7 @@
 build
 prebuilds
 sandbox
+sandbox.js
 node_modules
+coverage
 package-lock.json
