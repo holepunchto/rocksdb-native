@@ -1,7 +1,7 @@
 const ReadyResource = require('ready-resource')
 const binding = require('./binding')
 
-class RocksDB extends ReadyResource {
+module.exports = class RocksDB extends ReadyResource {
   constructor (path) {
     super()
 
@@ -13,8 +13,11 @@ class RocksDB extends ReadyResource {
     this._status = null
     this._writes = null
     this._writesNext = null
+    this._writesBuffer = 8
     this._reads = null
     this._readsNext = null
+    this._readsBuffer = 8
+
     this._queueWriteBound = this._queueWrite.bind(this)
     this._queueReadBound = this._queueRead.bind(this)
 
@@ -69,6 +72,12 @@ class RocksDB extends ReadyResource {
     this._writesNext = this._readsNext = null
 
     this._autoFlush[0] = 0
+
+    if ((this._writes !== null && this._writes.length > this._writesBuffer) || (this._reads !== null && this._reads.length > this._readsBuffer)) {
+      if (this._writes) this._writesBuffer = Math.max(this._writes.length, this._writesBuffer)
+      if (this._reads) this._readsBuffer = Math.max(this._reads.length, this._readsBuffer)
+      binding.rocksdb_native_resize_buffers(this._handle, this._writesBuffer, this._readsBuffer)
+    }
 
     if (this._writes !== null) {
       for (let i = 0; i < this._writes.length; i++) {
@@ -126,6 +135,21 @@ class RocksDB extends ReadyResource {
     return promise
   }
 
+  async getBatch (keys) {
+    if (this.opened === false) await this.ready()
+
+    const proms = new Array(keys.length)
+    for (let i = 0; i < proms.length; i++) {
+      const key = keys[i]
+      proms[i] = new Promise(this._queueReadBound)
+      const b = this._readsNext[this._readsNext.length - 1]
+      b.key = this._encodeKey(key)
+    }
+
+    this._flush()
+    return Promise.all(proms)
+  }
+
   _onbatchdone (buffers) {
     if (this._writes !== null) {
       const writes = this._writes
@@ -161,19 +185,3 @@ class RocksDB extends ReadyResource {
 }
 
 function noop () {}
-
-main()
-
-async function main () {
-  const db = new RocksDB('sandbox/test-db')
-
-  await db.batch([
-    { key: 'a', value: 'a' },
-    { key: 'b', value: 'b' },
-    { key: 'c', value: 'c' }
-  ])
-
-  const val = await db.get('b')
-
-  console.log('done!', val)
-}
