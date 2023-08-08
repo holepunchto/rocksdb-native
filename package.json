@@ -3,8 +3,9 @@
   "version": "0.0.0",
   "description": "WIP - nothing to see here",
   "main": "index.js",
-  "dependencies": {},
-  "devDependencies": {},
+  "dependencies": {
+    "ready-resource": "^1.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/mafintosh/rocksdb-native2.git"
