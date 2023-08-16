@@ -1,202 +1,187 @@
-const path = require('path')
 const ReadyResource = require('ready-resource')
 const binding = require('./binding')
 
-module.exports = class Database extends ReadyResource {
-  constructor (name) {
+module.exports = class RocksDB extends ReadyResource {
+  constructor (path) {
     super()
 
-    this._name = path.resolve(name)
-    this._handle = null
-    this._reqs = []
+    if (typeof path !== 'string') throw new Error('path is required and must be a string')
+
+    this._path = path
+    this._handle = Buffer.allocUnsafe(binding.sizeof_rocksdb_native_t)
+    this._autoFlush = new Int32Array(this._handle.buffer, this._handle.byteOffset + binding.offsetof_auto_flush, 1)
+    this._status = null
+    this._writes = null
+    this._writesNext = null
+    this._writesBuffer = 8
+    this._reads = null
+    this._readsNext = null
+    this._readsBuffer = 8
+
+    this._queueWriteBound = this._queueWrite.bind(this)
+    this._queueReadBound = this._queueRead.bind(this)
+
+    binding.rocksdb_native_init(this._handle, this, this._onstatuschange, this._onbatchdone)
+    this.ready().catch(noop)
   }
 
-  async _open () {
-    const req = binding.createOpenReq()
+  _encodeKey (k) {
+    return typeof k === 'string' ? Buffer.from(k) : k
+  }
 
-    const ctx = {
-      self: this,
-      req,
-      resolve: null,
-      reject: null
-    }
+  _encodeValue (v) {
+    return typeof v === 'string' ? Buffer.from(v) : v
+  }
 
+  _open () {
     const promise = new Promise((resolve, reject) => {
-      ctx.resolve = resolve
-      ctx.reject = reject
+      this._status = { resolve, reject }
     })
-
-    binding.open(req, this._name, ctx, onopen)
-
+    binding.rocksdb_native_open(this._handle, this._path)
     return promise
   }
 
-  async _close () {
-    const req = binding.createCloseReq()
+  _close () {
+    console.log('TODO: close')
+  }
 
-    const ctx = {
-      self: this,
-      req,
-      resolve: null,
-      reject: null
+  _queueWrite (resolve, reject) {
+    if (this._writesNext === null) this._writesNext = []
+    this._writesNext.push({
+      key: null,
+      value: null,
+      resolve,
+      reject
+    })
+  }
+
+  _queueRead (resolve, reject) {
+    if (this._readsNext === null) this._readsNext = []
+    this._readsNext.push({
+      key: null,
+      resolve,
+      reject
+    })
+  }
+
+  _flush () {
+    if (this._reads !== null || this._writes !== null) return
+
+    this._reads = this._readsNext
+    this._writes = this._writesNext
+    this._writesNext = this._readsNext = null
+
+    this._autoFlush[0] = 0
+
+    if ((this._writes !== null && this._writes.length > this._writesBuffer) || (this._reads !== null && this._reads.length > this._readsBuffer)) {
+      if (this._writes) this._writesBuffer = Math.max(this._writes.length, this._writesBuffer)
+      if (this._reads) this._readsBuffer = Math.max(this._reads.length, this._readsBuffer)
+      binding.rocksdb_native_resize_buffers(this._handle, this._writesBuffer, this._readsBuffer)
     }
 
-    const promise = new Promise((resolve, reject) => {
-      ctx.resolve = resolve
-      ctx.reject = reject
-    })
+    if (this._writes !== null) {
+      for (let i = 0; i < this._writes.length; i++) {
+        const w = this._writes[i]
+        if (i === this._writes.length - 1 && this._reads === null) this._autoFlush[0] = 1
+        binding.rocksdb_native_queue_put(this._handle, w.key, w.value)
+      }
+    }
 
-    binding.close(req, this._handle, ctx, onclose)
+    if (this._reads !== null) {
+      for (let i = 0; i < this._reads.length; i++) {
+        const r = this._reads[i]
+        if (i === this._reads.length - 1) this._autoFlush[0] = 1
+        binding.rocksdb_native_queue_get(this._handle, r.key)
+      }
+    }
+  }
+
+  async batch (list) {
+    for (let i = 0; i < list.length - 1; i++) {
+      const op = list[i]
+      this._queueWriteBound(null, null)
+      const b = this._writesNext[this._writesNext.length - 1]
+      b.key = this._encodeKey(op.key)
+      b.value = this._encodeValue(op.value)
+    }
+    const op = list[list.length - 1]
+    return this.put(op.key, op.value)
+  }
+
+  async put (key, value) {
+    if (this.opened === false) await this.ready()
+
+    const promise = new Promise(this._queueWriteBound)
+    const b = this._writesNext[this._writesNext.length - 1]
+
+    b.key = this._encodeKey(key)
+    b.value = this._encodeValue(value)
+
+    this._flush()
 
     return promise
   }
 
   async get (key) {
-    await this.ready()
+    if (this.opened === false) await this.ready()
 
-    const req = this._getReq()
+    const promise = new Promise(this._queueReadBound)
+    const b = this._readsNext[this._readsNext.length - 1]
 
-    const ctx = {
-      self: this,
-      req,
-      resolve: null,
-      reject: null,
-      key
-    }
+    b.key = this._encodeKey(key)
 
-    const promise = new Promise((resolve, reject) => {
-      ctx.resolve = resolve
-      ctx.reject = reject
-    })
-
-    binding.get(req, this._handle, key, ctx, onget)
+    this._flush()
 
     return promise
   }
 
-  async put (key, value) {
-    await this.ready()
+  async getBatch (keys) {
+    if (this.opened === false) await this.ready()
 
-    const req = this._getReq()
-
-    const ctx = {
-      self: this,
-      req,
-      resolve: null,
-      reject: null,
-      key,
-      value
+    const proms = new Array(keys.length)
+    for (let i = 0; i < proms.length; i++) {
+      const key = keys[i]
+      proms[i] = new Promise(this._queueReadBound)
+      const b = this._readsNext[this._readsNext.length - 1]
+      b.key = this._encodeKey(key)
     }
 
-    const promise = new Promise((resolve, reject) => {
-      ctx.resolve = resolve
-      ctx.reject = reject
-    })
-
-    binding.put(req, this._handle, key, value, ctx, onput)
-
-    return promise
+    this._flush()
+    return Promise.all(proms)
   }
 
-  async delete (key) {
-    await this.ready()
-
-    const req = this._getReq()
-
-    const ctx = {
-      self: this,
-      req,
-      resolve: null,
-      reject: null,
-      key
+  _onbatchdone (buffers) {
+    if (this._writes !== null) {
+      const writes = this._writes
+      this._writes = null
+      for (let i = 0; i < writes.length; i++) {
+        if (writes[i].resolve !== null) writes[i].resolve()
+      }
     }
 
-    const promise = new Promise((resolve, reject) => {
-      ctx.resolve = resolve
-      ctx.reject = reject
-    })
+    if (this._reads !== null) {
+      const reads = this._reads
+      this._reads = null
 
-    binding.delete(req, this._handle, key, ctx, ondelete)
+      for (let i = 0; i < buffers.length; i++) {
+        const buf = buffers[i]
+        const val = buf === null ? null : Buffer.from(buffers[i])
+        reads[i].resolve(val)
+      }
+    }
 
-    return promise
+    if (this._writesNext !== null || this._readsNext !== null) {
+      this._flush()
+    }
   }
 
-  _getReq () {
-    return this._reqs.length ? this._reqs.pop() : binding.createKeyValueReq()
-  }
-
-  _releaseReq (req) {
-    this._reqs.push(req)
-  }
-}
-
-function onopen (err, handle) {
-  const {
-    self,
-    resolve,
-    reject
-  } = this
-
-  if (err) reject(err)
-  else {
-    self._handle = handle
-    resolve()
+  _onstatuschange (status) {
+    const err = status < 0 ? new Error(binding.rocksdb_native_clear_error(this._handle)) : null
+    const { resolve, reject } = this._status
+    this._status = null
+    if (err) reject(err)
+    else resolve(null)
   }
 }
 
-function onclose (err) {
-  const {
-    self,
-    resolve,
-    reject
-  } = this
-
-  if (err) reject(err)
-  else {
-    self._handle = null
-    resolve()
-  }
-}
-
-function onget (err, buf) {
-  const {
-    self,
-    req,
-    resolve,
-    reject
-  } = this
-
-  self._releaseReq(req)
-
-  if (err) reject(err)
-  else if (buf) resolve(Buffer.from(buf))
-  else resolve(null)
-}
-
-function onput (err) {
-  const {
-    self,
-    req,
-    resolve,
-    reject
-  } = this
-
-  self._releaseReq(req)
-
-  if (err) reject(err)
-  else resolve()
-}
-
-function ondelete (err) {
-  const {
-    self,
-    req,
-    resolve,
-    reject
-  } = this
-
-  self._releaseReq(req)
-
-  if (err) reject(err)
-  else resolve()
-}
+function noop () {}
