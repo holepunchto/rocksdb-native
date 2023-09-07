@@ -3,6 +3,23 @@
   "version": "0.0.0",
   "description": "RocksDB native bindings",
   "main": "index.js",
+  "files": [
+    "index.js",
+    "binding.c",
+    "binding.gyp",
+    "binding.js",
+    "CMakeLists.txt",
+    "prebuilds",
+    "vendor/rocksdb.cc",
+    "vendor/rocksdb.gyp",
+    "vendor/rocksdb/**/CMakeLists.txt",
+    "vendor/rocksdb/**/*.cmake",
+    "vendor/rocksdb/**/*.cmake.in",
+    "vendor/rocksdb/**/*.cc",
+    "vendor/rocksdb/**/*.cc.in",
+    "vendor/rocksdb/**/*.h",
+    "vendor/rocksdb/**/*.pc.in"
+  ],
   "dependencies": {
     "node-gyp-build": "^4.6.1",
     "ready-resource": "^1.0.0"
