@@ -8,41 +8,82 @@
 #include <assert.h>
 
 typedef struct {
-  char *key;
-  size_t key_length;
-  char *value;
-  size_t value_length;
-} rocksdb_native_queue_t;
+  int size;
+  int max_size;
+
+  char **keys;
+  char **values;
+  char **errors;
+
+  size_t *key_lengths;
+  size_t *value_lengths;
+} rocksdb_native_batch_t;
+
+typedef struct {
+  uint32_t read_only;
+  uint32_t create_if_missing;
+  uint32_t max_background_jobs;
+  uint32_t bytes_per_sync;
+  uint32_t compaction_style;
+  uint32_t table_block_size;
+  uint32_t table_cache_index_and_filter_blocks;
+  uint32_t table_pin_l0_filter_and_index_blocks_in_cache;
+  uint32_t table_format_version;
+  uint32_t enable_blob_files;
+  uint32_t min_blob_size;
+  uint32_t blob_file_size_low;
+  uint32_t blob_file_size_high;
+  uint32_t enable_blob_garbage_collection;
+} rocksdb_native_open_options_t;
+
+typedef struct {
+  utf8_t path[4096 + 1];
+  rocksdb_native_open_options_t options;
+} rocksdb_native_open_t;
 
 typedef struct {
   uv_work_t work;
-  int auto_flush;
+  int status;
 
   rocksdb_t *db;
-
   uv_loop_t *loop;
-  js_env_t *env;
 
+  js_env_t *env;
   js_ref_t *ctx;
   js_ref_t *on_status;
   js_ref_t *on_batch;
 
-  utf8_t *path;
-  char *error;
-
-  int writes_length;
-  int writes_max;
-  rocksdb_native_queue_t *writes;
-
-  int reads_length;
-  int reads_max;
-  rocksdb_native_queue_t *reads;
+  rocksdb_native_batch_t write_batch;
+  rocksdb_native_batch_t read_batch;
 } rocksdb_native_t;
+
+#define ROCKSDB_NATIVE_BATCH_ERROR    0b01
+#define ROCKSDB_NATIVE_BATCH_NO_ERROR 0b10
+#define ROCKSDB_NATIVE_AUTO_FLUSH     0b10
+
+static void
+resize_batch (rocksdb_native_batch_t *b, int max_size, int free_old) {
+  if (free_old) free(b->keys);
+
+  b->size = 0;
+  b->max_size = max_size;
+
+  char **tmp = malloc((3 * max_size * sizeof(char *)) + (2 * max_size * sizeof(size_t)));
+
+  b->keys = tmp;
+  b->values = b->keys + max_size;
+  b->errors = b->values + max_size;
+
+  tmp = b->errors + max_size;
+
+  b->key_lengths = (size_t *) tmp;
+  b->value_lengths = b->key_lengths + max_size;
+}
 
 static js_value_t *
 rocksdb_native_init (js_env_t *env, js_callback_info_t *info) {
-  size_t argc = 4;
-  js_value_t *argv[4];
+  size_t argc = 5;
+  js_value_t *argv[5];
 
   js_get_callback_info(env, info, &argc, argv, NULL, NULL);
 
@@ -51,35 +92,29 @@ rocksdb_native_init (js_env_t *env, js_callback_info_t *info) {
   js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
 
   memset(self, 0, sizeof(uv_work_t));
+  self->status = 0;
   self->db = NULL;
 
   js_get_env_loop(env, &(self->loop));
   self->env = env;
 
-  js_create_reference(env, argv[1], 1, &(self->ctx));
-  js_create_reference(env, argv[2], 1, &(self->on_status));
-  js_create_reference(env, argv[3], 1, &(self->on_batch));
+  int max_batch_size;
+  js_get_value_int32(env, argv[1], &max_batch_size);
 
-  self->path = NULL;
-  self->error = NULL;
+  js_create_reference(env, argv[2], 1, &(self->ctx));
+  js_create_reference(env, argv[3], 1, &(self->on_status));
+  js_create_reference(env, argv[4], 1, &(self->on_batch));
 
-  self->auto_flush = 1;
-
-  self->writes_max = 8;
-  self->writes_length = 0;
-  self->writes = malloc(sizeof(rocksdb_native_queue_t) * self->writes_max);
-
-  self->reads_max = 8;
-  self->reads_length = 0;
-  self->reads = malloc(sizeof(rocksdb_native_queue_t) * self->reads_max);
+  resize_batch(&(self->write_batch), max_batch_size, 0);
+  resize_batch(&(self->read_batch), max_batch_size, 0);
 
   return NULL;
 }
 
 static js_value_t *
-rocksdb_native_clear_error (js_env_t *env, js_callback_info_t *info) {
-  size_t argc = 1;
-  js_value_t *argv[1];
+rocksdb_native_set_read_buffer_size (js_env_t *env, js_callback_info_t *info) {
+  size_t argc = 2;
+  js_value_t *argv[2];
 
   js_get_callback_info(env, info, &argc, argv, NULL, NULL);
 
@@ -87,32 +122,31 @@ rocksdb_native_clear_error (js_env_t *env, js_callback_info_t *info) {
   size_t self_len;
   js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
 
-  if (self->error == NULL) return NULL;
+  int max_size;
+  js_get_value_int32(env, argv[1], &max_size);
 
-  js_value_t *result;
-  js_create_string_utf8(env, (const utf8_t *) self->error, strlen(self->error), &result);
-  free(self->error);
-  self->error = NULL;
+  resize_batch(&(self->read_batch), max_size, 1);
 
-  return result;
+  return NULL;
 }
 
-static void
-on_worker_open (uv_work_t *req) {
-  rocksdb_native_t *self = (rocksdb_native_t *) req;
+static js_value_t *
+rocksdb_native_set_write_buffer_size (js_env_t *env, js_callback_info_t *info) {
+  size_t argc = 2;
+  js_value_t *argv[2];
 
-  rocksdb_options_t *opts = rocksdb_options_create();
+  js_get_callback_info(env, info, &argc, argv, NULL, NULL);
 
-  rocksdb_options_set_create_if_missing(opts, 1);
-  rocksdb_options_set_error_if_exists(opts, 0);
+  rocksdb_native_t *self;
+  size_t self_len;
+  js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
 
-  rocksdb_t *db = rocksdb_open(opts, (char *) self->path, &(self->error));
-  free(self->path);
-  self->path = NULL;
+  int max_size;
+  js_get_value_int32(env, argv[1], &max_size);
 
-  if (self->error == NULL) {
-    self->db = db;
-  }
+  resize_batch(&(self->write_batch), max_size, 1);
+
+  return NULL;
 }
 
 static void
@@ -126,34 +160,77 @@ on_worker_status_cb (uv_work_t *req, int st) {
   js_get_reference_value(env, self->ctx, &ctx);
   js_get_reference_value(env, self->on_status, &on_status);
 
-  js_value_t *status;
-  js_create_int32(env, self->error ? -1 : 0, &status);
+  js_value_t *value;
 
-  js_call_function(env, ctx, on_status, 1, &status, NULL);
+  if (req->data != NULL) {
+    js_create_string_utf8(env, (utf8_t *) req->data, -1, &value);
+    free(req->data);
+  } else {
+    js_get_null(env, &value);
+  }
+
+  js_call_function(env, ctx, on_status, 1, &value, NULL);
+}
+
+static uint64_t
+uint32s_to_64 (uint32_t low, uint32_t high) {
+  uint64_t s = low;
+  s *= 0x100000000;
+  s += high;
+  return s;
+}
+
+static void
+on_worker_open (uv_work_t *req) {
+  rocksdb_native_t *self = (rocksdb_native_t *) req;
+  uv_handle_t *handle = (uv_handle_t *) self;
+
+  rocksdb_native_open_t *o = handle->data;
+
+  rocksdb_options_t *opts = rocksdb_options_create();
+  rocksdb_block_based_table_options_t *topts = rocksdb_block_based_options_create();
+
+  rocksdb_options_set_create_if_missing(opts, o->options.create_if_missing);
+  rocksdb_options_set_error_if_exists(opts, 0);
+
+  rocksdb_options_set_max_background_jobs(opts, o->options.max_background_jobs);
+  rocksdb_options_set_bytes_per_sync(opts, o->options.bytes_per_sync);
+  rocksdb_options_set_compaction_style(opts, o->options.compaction_style);
+
+  rocksdb_block_based_options_set_block_size(topts, o->options.table_block_size);
+  rocksdb_block_based_options_set_cache_index_and_filter_blocks(topts, o->options.table_cache_index_and_filter_blocks);
+  rocksdb_block_based_options_set_pin_l0_filter_and_index_blocks_in_cache(topts, o->options.table_pin_l0_filter_and_index_blocks_in_cache);
+  rocksdb_block_based_options_set_format_version(topts, o->options.table_format_version);
+
+  rocksdb_options_set_block_based_table_factory(opts, topts);
+
+  if (o->options.enable_blob_files) {
+    rocksdb_options_set_enable_blob_files(opts, 1);
+    if (o->options.min_blob_size) rocksdb_options_set_min_blob_size(opts, o->options.min_blob_size);
+    uint64_t blob_file_size = uint32s_to_64(o->options.blob_file_size_low, o->options.blob_file_size_high);
+    if (blob_file_size) rocksdb_options_set_blob_file_size(opts, blob_file_size);
+    rocksdb_options_set_enable_blob_gc(opts, o->options.enable_blob_garbage_collection);
+  }
+
+  char *error = NULL;
+
+  rocksdb_t *db = o->options.read_only
+    ? rocksdb_open_for_read_only(opts, (char *) o->path, 0, &error)
+    : rocksdb_open(opts, (char *) o->path, &error);
+
+  free(o);
+
+  if (error != NULL) {
+    req->data = error;
+    return;
+  }
+
+  req->data = NULL;
+  self->db = db;
 }
 
 static js_value_t *
 rocksdb_native_open (js_env_t *env, js_callback_info_t *info) {
-  size_t argc = 2;
-  js_value_t *argv[2];
-
-  js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-
-  rocksdb_native_t *self;
-  size_t self_len;
-  js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
-
-  self->path = malloc(4096 * sizeof(utf8_t) + 1);
-
-  js_get_value_string_utf8(env, argv[1], self->path, 4097, NULL);
-
-  uv_queue_work(self->loop, (uv_work_t *) self, on_worker_open, on_worker_status_cb);
-
-  return NULL;
-}
-
-static js_value_t *
-rocksdb_native_resize_buffers (js_env_t *env, js_callback_info_t *info) {
   size_t argc = 3;
   js_value_t *argv[3];
 
@@ -163,87 +240,71 @@ rocksdb_native_resize_buffers (js_env_t *env, js_callback_info_t *info) {
   size_t self_len;
   js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
 
-  int writes;
-  js_get_value_int32(env, argv[1], &writes);
+  uv_handle_t *handle = (uv_handle_t *) self;
+  rocksdb_native_open_t *o = handle->data = malloc(sizeof(rocksdb_native_open_t));
 
-  int reads;
-  js_get_value_int32(env, argv[1], &reads);
+  js_get_value_string_utf8(env, argv[1], o->path, 4097, NULL);
 
-  if (writes != self->writes_max) {
-    self->writes_max = writes;
-    self->writes = realloc(self->writes, sizeof(rocksdb_native_queue_t) * self->writes_max);
-  }
+  rocksdb_native_open_options_t *opts;
+  size_t opts_len;
+  js_get_typedarray_info(env, argv[2], NULL, (void **) &opts, &opts_len, NULL, NULL);
 
-  if (reads != self->reads_max) {
-    self->reads_max = reads;
-    self->reads = realloc(self->reads, sizeof(rocksdb_native_queue_t) * self->reads_max);
-  }
+  o->options = *opts;
 
+  uv_queue_work(self->loop, (uv_work_t *) self, on_worker_open, on_worker_status_cb);
+
+  return NULL;
+}
+
+static void
+on_worker_close (uv_work_t *req) {
+  rocksdb_native_t *self = (rocksdb_native_t *) req;
+  uv_handle_t *handle = (uv_handle_t *) self;
+
+  rocksdb_close(self->db);
+
+  handle->data = NULL;
+}
+
+static js_value_t *
+rocksdb_native_close (js_env_t *env, js_callback_info_t *info) {
+  size_t argc = 1;
+  js_value_t *argv[1];
+
+  js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+
+  rocksdb_native_t *self;
+  size_t self_len;
+  js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
+
+  uv_queue_work(self->loop, (uv_work_t *) self, on_worker_close, on_worker_status_cb);
   return NULL;
 }
 
 static void
 on_worker_batch (uv_work_t *req) {
   rocksdb_native_t *self = (rocksdb_native_t *) req;
-  rocksdb_t *db = self->db;
 
-  rocksdb_native_queue_t *w = self->writes;
-  int len = self->writes_length;
+  rocksdb_native_batch_t *w = &(self->write_batch);
 
-  if (len == 1) {
-    rocksdb_writeoptions_t *wo = rocksdb_writeoptions_create();
-    rocksdb_put(db, wo, w->key, w->key_length, w->value, w->value_length, &(self->error));
-  } else if (len > 1) {
+  if (w->size) {
     rocksdb_writebatch_t *b = rocksdb_writebatch_create();
-    while (len-- && self->error == NULL) {
-      rocksdb_writebatch_put(b, w->key, w->key_length, w->value, w->value_length);
-      w++;
+    for (int i = 0; i < w->size; i++) {
+      size_t length = w->value_lengths[i];
+      if (length == 0) {
+        rocksdb_writebatch_delete(b, w->keys[i], w->key_lengths[i]);
+      } else {
+        rocksdb_writebatch_put(b, w->keys[i], w->key_lengths[i], w->values[i], length);
+      }
     }
     rocksdb_writeoptions_t *wo = rocksdb_writeoptions_create();
-    rocksdb_write(db, wo, b, &(self->error));
+    rocksdb_write(self->db, wo, b, w->errors);
   }
 
-  rocksdb_native_queue_t *r = self->reads;
-  len = self->reads_length;
-
-  if (len == 1) {
+  rocksdb_native_batch_t *r = &(self->read_batch);
+  if (r->size) {
     rocksdb_readoptions_t *ro = rocksdb_readoptions_create();
-    r->value = rocksdb_get(db, ro, r->key, r->key_length, &(r->value_length), &(self->error));
-  } else if (len > 1) {
-    char **keys = malloc(sizeof(char *) * len);
-    size_t *keys_lengths = malloc(sizeof(size_t) * len);
-
-    char **vals = malloc(sizeof(char *) * len);
-    size_t *vals_lengths = malloc(sizeof(size_t) * len);
-
-    char **errs = malloc(sizeof(char *) * len);
-
-    for (int i = 0; i < len; i++) {
-      keys[i] = r->key;
-      keys_lengths[i] = r->key_length;
-      r++;
-    }
-
-    r = self->reads;
-    rocksdb_readoptions_t *ro = rocksdb_readoptions_create();
-    rocksdb_multi_get(db, ro, len, (const char * const*) keys, keys_lengths, vals, vals_lengths, errs);
-
-    for (int i = 0; i < len; i++) {
-      if (errs[i]) {
-        if (self->error) free(self->error);
-        self->error = errs[i];
-      }
-
-      r->value = *(vals + i);
-      r->value_length = *(vals_lengths + i);
-      r++;
-    }
-
-    free(vals);
-    free(vals_lengths);
-    free(keys);
-    free(keys_lengths);
-    free(errs);
+    rocksdb_multi_get(self->db, ro, r->size, (const char * const*) r->keys, r->key_lengths, r->values, r->value_lengths, r->errors);
   }
 }
 
@@ -255,41 +316,43 @@ free_db_read (js_env_t *env, void *data, void *hint) {
 static void
 on_worker_batch_cb (uv_work_t *req, int st) {
   rocksdb_native_t *self = (rocksdb_native_t *) req;
+  rocksdb_native_batch_t *r = &(self->read_batch);
 
   js_env_t *env = self->env;
-  js_value_t *ctx;
-  js_value_t *on_batch;
+  js_value_t *gets;
+  js_create_array_with_length(env, r->size, &gets);
 
-  rocksdb_native_queue_t *r = self->reads;
+  js_value_t *value;
+  for (int i = 0; i < r->size; i++) {
+    if (r->values[i] == NULL) {
+      js_get_null(env, &value);
+      if (r->errors[i] != NULL) {
+        free(r->errors[i]); // ignore for now... we signal null anyway
+      }
+    } else {
+      js_create_external_arraybuffer(env, r->values[i], r->value_lengths[i], free_db_read, NULL, &value);
+    }
 
-  js_handle_scope_t *scope;
-  js_open_handle_scope(env, &scope);
-
-  js_value_t *result;
-  js_create_array_with_length(env, self->reads_length, &result);
-
-  for (int i = 0; i < self->reads_length; i++) {
-    js_value_t *val;
-    if (r->value == NULL) js_get_null(env, &val);
-    else js_create_external_arraybuffer(env, r->value, r->value_length, free_db_read, NULL, &val);
-    js_set_element(env, result, i, val);
-    r++;
+    js_set_element(env, gets, i, value);
   }
 
-  self->reads_length = self->writes_length = 0;
+  js_value_t *ctx;
+  js_value_t *on_batch;
 
   js_get_reference_value(env, self->ctx, &ctx);
   js_get_reference_value(env, self->on_batch, &on_batch);
 
-  js_call_function(env, ctx, on_batch, 1, &result, NULL);
+  js_value_t *values[1] = {
+    gets
+  };
 
-  js_close_handle_scope(env, scope);
+  js_call_function(env, ctx, on_batch, 1, values, NULL);
 }
 
 static js_value_t *
-rocksdb_native_queue_put (js_env_t *env, js_callback_info_t *info) {
-  size_t argc = 3;
-  js_value_t *argv[3];
+rocksdb_native_batch (js_env_t *env, js_callback_info_t *info) {
+  size_t argc = 4;
+  js_value_t *argv[4];
 
   js_get_callback_info(env, info, &argc, argv, NULL, NULL);
 
@@ -297,52 +360,53 @@ rocksdb_native_queue_put (js_env_t *env, js_callback_info_t *info) {
   size_t self_len;
   js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
 
-  rocksdb_native_queue_t *w = self->writes + (self->writes_length++);
+  uint32_t reads;
+  js_value_t *read_keys = argv[1];
 
-  js_get_typedarray_info(env, argv[1], NULL, (void **) &(w->key), &(w->key_length), NULL, NULL);
+  js_get_array_length(env, read_keys, &reads);
 
-  js_get_typedarray_info(env, argv[2], NULL, (void **) &(w->value), &(w->value_length), NULL, NULL);
+  rocksdb_native_batch_t *r = &(self->read_batch);
 
-  if (self->auto_flush) {
-    uv_queue_work(self->loop, (uv_work_t *) self, on_worker_batch, on_worker_batch_cb);
+  r->size = reads;
+  js_value_t *item;
+
+  for (int i = 0; i < reads; i++) {
+    js_get_element(env, read_keys, i, &item);
+
+    char **key = r->keys + i;;
+    size_t *key_length = r->key_lengths + i;
+
+    js_get_typedarray_info(env, item, NULL, (void **) key, key_length, NULL, NULL);
   }
 
-  return NULL;
-}
+  uint32_t writes;
+  js_value_t *write_keys = argv[2];
+  js_value_t *write_values = argv[3];
 
-static inline void
-queue_get (rocksdb_native_t *self, char *key, size_t key_length) {
-  rocksdb_native_queue_t *r = self->reads + (self->reads_length++);
+  js_get_array_length(env, write_keys, &writes);
+  js_get_array_length(env, write_values, &writes);
 
-  r->key = key;
-  r->key_length = key_length;
+  rocksdb_native_batch_t *w = &(self->write_batch);
 
-  if (self->auto_flush) {
-    uv_queue_work(self->loop, (uv_work_t *) self, on_worker_batch, on_worker_batch_cb);
+  w->size = writes;
+
+  for (int i = 0; i < writes; i++) {
+    js_get_element(env, write_keys, i, &item);
+
+    char **key = w->keys + i;;
+    size_t *key_length = w->key_lengths + i;
+
+    js_get_typedarray_info(env, item, NULL, (void **) key, key_length, NULL, NULL);
+
+    js_get_element(env, write_values, i, &item);
+
+    char **value = w->values + i;;
+    size_t *value_length = w->value_lengths + i;
+
+    js_get_typedarray_info(env, item, NULL, (void **) value, value_length, NULL, NULL);
   }
-}
 
-static void
-rocksdb_native_queue_get_fast (js_ffi_receiver_t *recv, js_ffi_typedarray_t *handle, js_ffi_typedarray_t *key) {
-  queue_get((rocksdb_native_t *) handle->data.u8, (char *) key->data.u8, key->len);
-}
-
-static js_value_t *
-rocksdb_native_queue_get (js_env_t *env, js_callback_info_t *info) {
-  size_t argc = 3;
-  js_value_t *argv[3];
-
-  js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-
-  rocksdb_native_t *self;
-  size_t self_len;
-  js_get_typedarray_info(env, argv[0], NULL, (void **) &self, &self_len, NULL, NULL);
-
-  char *key;
-  size_t key_length;
-  js_get_typedarray_info(env, argv[1], NULL, (void **) &key, &key_length, NULL, NULL);
-
-  queue_get(self, key, key_length);
+  uv_queue_work(self->loop, (uv_work_t *) self, on_worker_batch, on_worker_batch_cb);
 
   return NULL;
 }
@@ -358,10 +422,10 @@ init (js_env_t *env, js_value_t *exports) {
   {
     rocksdb_native_t tmp;
     char *a = (char *) &tmp;
-    char *b = (char *) &(tmp.auto_flush);
+    char *b = (char *) &(tmp.status);
     js_value_t *val;
     js_create_int32(env, (int) (b - a), &val);
-    js_set_named_property(env, exports, "offsetof_auto_flush", val);
+    js_set_named_property(env, exports, "offsetof_rocksdb_native_t_status", val);
   }
 
   {
@@ -372,46 +436,32 @@ init (js_env_t *env, js_value_t *exports) {
 
   {
     js_value_t *fn;
-    js_create_function(env, "rocksdb_native_clear_error", -1, rocksdb_native_clear_error, NULL, &fn);
-    js_set_named_property(env, exports, "rocksdb_native_clear_error", fn);
-  }
-
-  {
-    js_value_t *fn;
-    js_create_function(env, "rocksdb_native_resize_buffers", -1, rocksdb_native_resize_buffers, NULL, &fn);
-    js_set_named_property(env, exports, "rocksdb_native_resize_buffers", fn);
-  }
-
-  {
-    js_value_t *fn;
     js_create_function(env, "rocksdb_native_open", -1, rocksdb_native_open, NULL, &fn);
     js_set_named_property(env, exports, "rocksdb_native_open", fn);
   }
 
   {
     js_value_t *fn;
-    js_create_function(env, "rocksdb_native_queue_put", -1, rocksdb_native_queue_put, NULL, &fn);
-    js_set_named_property(env, exports, "rocksdb_native_queue_put", fn);
+    js_create_function(env, "rocksdb_native_close", -1, rocksdb_native_close, NULL, &fn);
+    js_set_named_property(env, exports, "rocksdb_native_close", fn);
   }
 
   {
-    js_ffi_type_info_t *return_info;
-    js_ffi_create_type_info(js_ffi_void, &return_info);
-
-    js_ffi_type_info_t *arg_info[3];
-    js_ffi_create_type_info(js_ffi_receiver, &arg_info[0]);
-    js_ffi_create_type_info(js_ffi_uint8array, &arg_info[1]);
-    js_ffi_create_type_info(js_ffi_uint8array, &arg_info[2]);
-
-    js_ffi_function_info_t *function_info;
-    js_ffi_create_function_info(return_info, arg_info, 3, &function_info);
-
-    js_ffi_function_t *ffi;
-    js_ffi_create_function(rocksdb_native_queue_get_fast, function_info, &ffi);
-
     js_value_t *fn;
-    js_create_function_with_ffi(env, "rocksdb_native_queue_get", -1, rocksdb_native_queue_get, NULL, ffi, &fn);
-    js_set_named_property(env, exports, "rocksdb_native_queue_get", fn);
+    js_create_function(env, "rocksdb_native_batch", -1, rocksdb_native_batch, NULL, &fn);
+    js_set_named_property(env, exports, "rocksdb_native_batch", fn);
+  }
+
+  {
+    js_value_t *fn;
+    js_create_function(env, "rocksdb_native_set_read_buffer_size", -1, rocksdb_native_set_read_buffer_size, NULL, &fn);
+    js_set_named_property(env, exports, "rocksdb_native_set_read_buffer_size", fn);
+  }
+
+  {
+    js_value_t *fn;
+    js_create_function(env, "rocksdb_native_set_write_buffer_size", -1, rocksdb_native_set_write_buffer_size, NULL, &fn);
+    js_set_named_property(env, exports, "rocksdb_native_set_write_buffer_size", fn);
   }
 
   return exports;

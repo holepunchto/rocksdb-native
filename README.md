@@ -1,17 +1,15 @@
-# rocksdb-native2
-
-WIP - nothing to see here
+# rocksdb-native
 
 ```
-npm install rocksdb-native2
+npm install rocksdb-native
 ```
 
 ## Usage
 
 ``` js
-const rocksdb-native2 = require('rocksdb-native2')
+const RocksDB = require('rocksdb-native')
 ```
 
 ## License
 
-MIT
+Apache-2.0
