@@ -4,6 +4,7 @@
   "description": "RocksDB native bindings",
   "main": "index.js",
   "dependencies": {
+    "node-gyp-build": "^4.6.1",
     "ready-resource": "^1.0.0"
   },
   "repository": {
