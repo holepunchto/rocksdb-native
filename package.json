@@ -1,19 +1,19 @@
 {
   "name": "rocksdb-native",
   "version": "0.0.0",
-  "description": "WIP - nothing to see here",
+  "description": "RocksDB native bindings",
   "main": "index.js",
   "dependencies": {
     "ready-resource": "^1.0.0"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mafintosh/rocksdb-native2.git"
+    "url": "https://github.com/holepunchto/rocksdb-native.git"
   },
-  "author": "Mathias Buus (@mafintosh)",
-  "license": "MIT",
+  "author": "Holepunch Inc",
+  "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/mafintosh/rocksdb-native2/issues"
+    "url": "https://github.com/holepunchto/rocksdb-native/issues"
   },
-  "homepage": "https://github.com/mafintosh/rocksdb-native2"
+  "homepage": "https://github.com/holepunchto/rocksdb-native"
 }
