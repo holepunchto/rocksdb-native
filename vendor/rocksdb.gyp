@@ -346,6 +346,20 @@
         'defines': [
           'OS_MACOSX',
         ],
+        'xcode_settings': {
+          'OTHER_CFLAGS': [
+            '-fexceptions',
+            '-Wsign-compare',
+            '-Wshadow',
+            '-Wno-unused-parameter',
+            '-Wno-unused-variable',
+            '-Woverloaded-virtual',
+            '-Wnon-virtual-dtor',
+            '-Wno-missing-field-initializers',
+            '-Wno-strict-aliasing',
+            '-Wno-invalid-offsetof',
+          ],
+        },
       }],
       ['OS=="win"', {
         'defines': [
@@ -369,6 +383,18 @@
           './rocksdb/env/env_posix.cc',
           './rocksdb/env/fs_posix.cc',
           './rocksdb/env/io_posix.cc',
+        ],
+        'cflags_cc': [
+          '-fexceptions',
+          '-Wsign-compare',
+          '-Wshadow',
+          '-Wno-unused-parameter',
+          '-Wno-unused-variable',
+          '-Woverloaded-virtual',
+          '-Wnon-virtual-dtor',
+          '-Wno-missing-field-initializers',
+          '-Wno-strict-aliasing',
+          '-Wno-invalid-offsetof',
         ],
       }],
     ],
