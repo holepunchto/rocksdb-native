@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(rocksdb_native C)
+project(rocksdb_native C CXX)
 
 include(bare)
 
