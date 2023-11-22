@@ -169,7 +169,10 @@ on_worker_status_cb (uv_work_t *req, int st) {
     js_get_null(env, &value);
   }
 
+  js_handle_scope_t *scope;
+  js_open_handle_scope(env, &scope);
   js_call_function(env, ctx, on_status, 1, &value, NULL);
+  js_close_handle_scope(env, scope);
 }
 
 static uint64_t
@@ -261,6 +264,7 @@ on_worker_close (uv_work_t *req) {
   rocksdb_native_t *self = (rocksdb_native_t *) req;
   uv_handle_t *handle = (uv_handle_t *) self;
 
+  rocksdb_cancel_all_background_work(self->db, 1);
   rocksdb_close(self->db);
 
   handle->data = NULL;
@@ -310,7 +314,7 @@ on_worker_batch (uv_work_t *req) {
 
 static void
 free_db_read (js_env_t *env, void *data, void *hint) {
-  free(data);
+  rocksdb_free(data);
 }
 
 static void
@@ -319,6 +323,10 @@ on_worker_batch_cb (uv_work_t *req, int st) {
   rocksdb_native_batch_t *r = &(self->read_batch);
 
   js_env_t *env = self->env;
+
+  js_handle_scope_t *scope;
+  js_open_handle_scope(env, &scope);
+
   js_value_t *gets;
   js_create_array_with_length(env, r->size, &gets);
 
@@ -330,7 +338,11 @@ on_worker_batch_cb (uv_work_t *req, int st) {
         free(r->errors[i]); // ignore for now... we signal null anyway
       }
     } else {
-      js_create_external_arraybuffer(env, r->values[i], r->value_lengths[i], free_db_read, NULL, &value);
+      // external array buffers with finalisation are broken atm, so just memcpy...
+      char *data;
+      js_create_arraybuffer(env, r->value_lengths[i], (void **) &data, &value);
+      memcpy(data, r->values[i], r->value_lengths[i]);
+      rocksdb_free(r->values[i]);
     }
 
     js_set_element(env, gets, i, value);
@@ -347,6 +359,7 @@ on_worker_batch_cb (uv_work_t *req, int st) {
   };
 
   js_call_function(env, ctx, on_batch, 1, values, NULL);
+  js_close_handle_scope(env, scope);
 }
 
 static js_value_t *
