@@ -1,6 +1,6 @@
 {
   "name": "rocksdb-native",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "RocksDB native bindings",
   "main": "index.js",
   "files": [
