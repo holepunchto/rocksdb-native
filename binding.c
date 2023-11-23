@@ -203,13 +203,13 @@ on_worker_open (uv_work_t *req) {
   rocksdb_block_based_options_set_pin_l0_filter_and_index_blocks_in_cache(topts, o->options.table_pin_l0_filter_and_index_blocks_in_cache);
   rocksdb_block_based_options_set_format_version(topts, o->options.table_format_version);
 
+  rocksdb_filterpolicy_t *filter = rocksdb_filterpolicy_create_bloom(10);
+  rocksdb_block_based_options_set_filter_policy(topts, filter);
+
   rocksdb_options_set_block_based_table_factory(opts, topts);
 
-  // rocksdb_filterpolicy_t *filter = rocksdb_filterpolicy_create_bloom(10);
-  // rocksdb_block_based_options_set_filter_policy(topts, filter);
-
-  // rocksdb_options_set_hash_link_list_rep(opts, 200000);
-  // rocksdb_options_set_allow_concurrent_memtable_write(opts, 0);
+  rocksdb_options_set_hash_link_list_rep(opts, 200000);
+  rocksdb_options_set_allow_concurrent_memtable_write(opts, 0);
 
   if (o->options.enable_blob_files) {
     rocksdb_options_set_enable_blob_files(opts, 1);
@@ -342,11 +342,7 @@ on_worker_batch_cb (uv_work_t *req, int st) {
         free(r->errors[i]); // ignore for now... we signal null anyway
       }
     } else {
-      // external array buffers with finalisation are broken atm, so just memcpy...
-      char *data;
-      js_create_arraybuffer(env, r->value_lengths[i], (void **) &data, &value);
-      memcpy(data, r->values[i], r->value_lengths[i]);
-      rocksdb_free(r->values[i]);
+      js_create_external_arraybuffer(env, r->values[i], r->value_lengths[i], free_db_read, NULL, &value);
     }
 
     js_set_element(env, gets, i, value);
