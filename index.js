@@ -54,7 +54,6 @@ module.exports = class RocksDB extends ReadyResource {
     createIfMissing = true,
     maxBackgroundJobs = 6,
     bytesPerSync = 1048576,
-    compactionStyle = 3, // https://github.com/facebook/rocksdb/blob/main/include/rocksdb/advanced_options.h#L41
     // (block) table options
     tableBlockSize = 16384,
     tableCacheIndexAndFilterBlocks = true,
@@ -74,7 +73,6 @@ module.exports = class RocksDB extends ReadyResource {
     this.createIfMissing = createIfMissing
     this.maxBackgroundJobs = maxBackgroundJobs
     this.bytesPerSync = bytesPerSync
-    this.compactionStyle = compactionStyle
 
     this.tableBlockSize = tableBlockSize
     this.tableCacheIndexAndFilterBlocks = tableCacheIndexAndFilterBlocks
@@ -105,22 +103,21 @@ module.exports = class RocksDB extends ReadyResource {
 
     const opening = new Promise(resolve => { this._statusResolve = resolve })
 
-    const opts = new Uint32Array(14)
+    const opts = new Uint32Array(13)
 
     opts[0] = this.readOnly ? 1 : 0
     opts[1] = this.createIfMissing ? 1 : 0
     opts[2] = this.maxBackgroundJobs
     opts[3] = this.bytesPerSync
-    opts[4] = this.compactionStyle
-    opts[5] = this.tableBlockSize
-    opts[6] = this.tableCacheIndexAndFilterBlocks ? 1 : 0
-    opts[7] = this.tablePinL0FilterAndIndexBlocksInCache ? 1 : 0
-    opts[8] = this.tableFormatVersion
-    opts[9] = this.enableBlobFiles ? 1 : 0
-    opts[10] = this.minBlobSize
-    opts[11] = this.blobFileSize & 0xffffffff
-    opts[12] = Math.floor(this.blobFileSize / 0x100000000)
-    opts[13] = this.enableBlobGarbageCollection ? 1 : 0
+    opts[4] = this.tableBlockSize
+    opts[5] = this.tableCacheIndexAndFilterBlocks ? 1 : 0
+    opts[6] = this.tablePinL0FilterAndIndexBlocksInCache ? 1 : 0
+    opts[7] = this.tableFormatVersion
+    opts[8] = this.enableBlobFiles ? 1 : 0
+    opts[9] = this.minBlobSize
+    opts[10] = this.blobFileSize & 0xffffffff
+    opts[11] = Math.floor(this.blobFileSize / 0x100000000)
+    opts[12] = this.enableBlobGarbageCollection ? 1 : 0
 
     binding.rocksdb_native_open(this._handle, this.path, opts)
 
@@ -158,20 +155,28 @@ module.exports = class RocksDB extends ReadyResource {
   }
 
   _onbatch (getValues) {
-    for (let i = 0; i < this._writes.promises.length; i++) {
-      const { resolve } = this._writes.promises[i]
-      resolve()
+    if (this._writes !== null) {
+      for (let i = 0; i < this._writes.promises.length; i++) {
+        const { resolve } = this._writes.promises[i]
+        resolve()
+      }
+      this._writes = null
     }
 
-    for (let i = 0; i < this._reads.promises.length; i++) {
-      const { resolve } = this._reads.promises[i]
-      const buffer = getValues[i]
-      resolve(buffer === null ? null : Buffer.from(buffer, 0, buffer.byteLength))
+    if (this._reads !== null) {
+      for (let i = 0; i < this._reads.promises.length; i++) {
+        const { resolve } = this._reads.promises[i]
+        const buffer = getValues[i]
+        resolve(buffer === null ? null : Buffer.from(buffer, 0, buffer.byteLength))
+      }
+      this._reads = null
     }
-
-    this._reads = this._writes = null
 
     while (this._flushes.length > 0) this._flushes.shift()()
+
+    if (this._nextReads.keys.length || this._nextWrites.keys.length) {
+      this._flushMaybe()
+    }
   }
 
   _encodeKey (k) {
@@ -197,9 +202,14 @@ module.exports = class RocksDB extends ReadyResource {
 
     if (this._reads.keys.length) {
       this._nextReads = new ReadBatch()
+    } else {
+      this._reads = null
     }
+
     if (this._writes.keys.length) {
       this._nextWrites = new WriteBatch()
+    } else {
+      this._writes = null
     }
   }
 
@@ -219,6 +229,7 @@ module.exports = class RocksDB extends ReadyResource {
     if (this.opened === false) await this.ready()
     if (this.closing) throw new Error('DB is closed')
     if (this.readOnly === true) throw new Error('DB is readOnly')
+    if (ops.length === 0) return
 
     const all = new Array(ops.length)
 
@@ -254,6 +265,7 @@ module.exports = class RocksDB extends ReadyResource {
   async getBatch (keys) {
     if (this.opened === false) await this.ready()
     if (this.closing) throw new Error('DB is closed')
+    if (keys.length === 0) return
 
     const all = new Array(keys.length)
 

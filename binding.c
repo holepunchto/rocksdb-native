@@ -24,7 +24,6 @@ typedef struct {
   uint32_t create_if_missing;
   uint32_t max_background_jobs;
   uint32_t bytes_per_sync;
-  uint32_t compaction_style;
   uint32_t table_block_size;
   uint32_t table_cache_index_and_filter_blocks;
   uint32_t table_pin_l0_filter_and_index_blocks_in_cache;
@@ -198,7 +197,6 @@ on_worker_open (uv_work_t *req) {
 
   rocksdb_options_set_max_background_jobs(opts, o->options.max_background_jobs);
   rocksdb_options_set_bytes_per_sync(opts, o->options.bytes_per_sync);
-  rocksdb_options_set_compaction_style(opts, o->options.compaction_style);
 
   rocksdb_block_based_options_set_block_size(topts, o->options.table_block_size);
   rocksdb_block_based_options_set_cache_index_and_filter_blocks(topts, o->options.table_cache_index_and_filter_blocks);
@@ -206,6 +204,12 @@ on_worker_open (uv_work_t *req) {
   rocksdb_block_based_options_set_format_version(topts, o->options.table_format_version);
 
   rocksdb_options_set_block_based_table_factory(opts, topts);
+
+  // rocksdb_filterpolicy_t *filter = rocksdb_filterpolicy_create_bloom(10);
+  // rocksdb_block_based_options_set_filter_policy(topts, filter);
+
+  // rocksdb_options_set_hash_link_list_rep(opts, 200000);
+  // rocksdb_options_set_allow_concurrent_memtable_write(opts, 0);
 
   if (o->options.enable_blob_files) {
     rocksdb_options_set_enable_blob_files(opts, 1);
