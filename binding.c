@@ -153,6 +153,10 @@ on_worker_status_cb (uv_work_t *req, int st) {
   rocksdb_native_t *self = (rocksdb_native_t *) req;
 
   js_env_t *env = self->env;
+
+  js_handle_scope_t *scope;
+  js_open_handle_scope(env, &scope);
+
   js_value_t *ctx;
   js_value_t *on_status;
 
@@ -168,8 +172,6 @@ on_worker_status_cb (uv_work_t *req, int st) {
     js_get_null(env, &value);
   }
 
-  js_handle_scope_t *scope;
-  js_open_handle_scope(env, &scope);
   js_call_function(env, ctx, on_status, 1, &value, NULL);
   js_close_handle_scope(env, scope);
 }
