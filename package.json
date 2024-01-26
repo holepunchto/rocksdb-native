@@ -33,5 +33,8 @@
   "bugs": {
     "url": "https://github.com/holepunchto/rocksdb-native/issues"
   },
-  "homepage": "https://github.com/holepunchto/rocksdb-native"
+  "homepage": "https://github.com/holepunchto/rocksdb-native",
+  "addon": {
+    "target": "rocksdb_native"
+  }
 }
