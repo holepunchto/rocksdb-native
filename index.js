@@ -51,7 +51,7 @@ class Batch {
       const err = errors[i]
 
       if (err) promise.reject(new Error(err))
-      else promise.resolve()
+      else promise.resolve(this._values[i])
     }
 
     this._onfinished()

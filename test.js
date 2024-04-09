@@ -11,7 +11,7 @@ test('write + read', async (t) => {
   {
     const p = batch.add('hello', 'world')
     await batch.write()
-    await p
+    t.alike(await p, b4a.from('world'))
   }
   {
     const p = batch.add('hello')
