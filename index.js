@@ -1,182 +1,114 @@
 const ReadyResource = require('ready-resource')
+const b4a = require('b4a')
 const binding = require('./binding')
 
-const DEFAULT_BUFFER_SIZE = 8
-const EMPTY = Buffer.alloc(0)
+const DEFAULT_BATCH_CAPACITY = 8
+const EMPTY = b4a.alloc(0)
 
-class ReadBatch {
-  constructor () {
-    this.keys = []
-    this.promises = []
-    this._queuePromiseBound = this._queuePromise.bind(this)
+class Batch {
+  constructor (db, capacity) {
+    this._db = db
+    this._capacity = capacity
+    this._keys = []
+    this._values = []
+    this._promises = []
+    this._enqueuePromise = this._enqueuePromise.bind(this)
+    this._request = null
+    this._resolveRequest = null
+    this._destroying = null
+    this._handle = binding.batchInit(capacity, this)
   }
 
-  _queuePromise (resolve, reject) {
-    this.promises.push({ resolve, reject })
+  _onfinished () {
+    const resolve = this._resolveRequest
+
+    this._keys = []
+    this._values = []
+    this._promises = []
+    this._request = null
+    this._resolveRequest = null
+
+    resolve()
   }
 
-  queue (key) {
-    const promise = new Promise(this._queuePromiseBound)
+  _onread (errors, values) {
+    for (let i = 0, n = this._promises.length; i < n; i++) {
+      const promise = this._promises[i]
 
-    this.keys.push(key)
+      const err = errors[i]
+
+      if (err) promise.reject(new Error(err))
+      else promise.resolve(b4a.from(values[i]))
+    }
+
+    this._onfinished()
+  }
+
+  _onwrite (errors) {
+    for (let i = 0, n = this._promises.length; i < n; i++) {
+      const promise = this._promises[i]
+
+      const err = errors[i]
+
+      if (err) promise.reject(new Error(err))
+      else promise.resolve()
+    }
+
+    this._onfinished()
+  }
+
+  add (key, value = EMPTY) {
+    const promise = new Promise(this._enqueuePromise)
+
+    this._keys.push(this._encodeKey(key))
+    this._values.push(this._encodeValue(value))
+    this._resize()
 
     return promise
   }
-}
 
-class WriteBatch {
-  constructor () {
-    this.keys = []
-    this.values = []
-    this.promises = []
-    this._queuePromiseBound = this._queuePromise.bind(this)
+  read () {
+    if (this._request) throw new Error('Request already in progress')
+    this._request = new Promise((resolve) => { this._resolveRequest = resolve })
+
+    binding.read(this._db._handle, this._handle, this._keys, this._onread)
+
+    return this._request
   }
 
-  _queuePromise (resolve, reject) {
-    this.promises.push({ resolve, reject })
+  write () {
+    if (this._request) throw new Error('Request already in progress')
+    this._request = new Promise((resolve) => { this._resolveRequest = resolve })
+
+    binding.write(this._db._handle, this._handle, this._keys, this._values, this._onwrite)
+
+    return this._request
   }
 
-  queue (key, value) {
-    const promise = new Promise(this._queuePromiseBound)
+  async _destroy () {
+    await this._request
 
-    this.keys.push(key)
-    this.values.push(value)
-
-    return promise
-  }
-}
-
-module.exports = class RocksDB extends ReadyResource {
-  constructor (path, {
-    // default options based on https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning
-    readOnly = false,
-    readonly = false, // alias
-    createIfMissing = true,
-    maxBackgroundJobs = 6,
-    bytesPerSync = 1048576,
-    // (block) table options
-    tableBlockSize = 16384,
-    tableCacheIndexAndFilterBlocks = true,
-    tablePinL0FilterAndIndexBlocksInCache = true,
-    tableFormatVersion = 4,
-    // blob options, https://github.com/facebook/rocksdb/wiki/BlobDB
-    enableBlobFiles = false,
-    minBlobSize = 0,
-    blobFileSize = 0,
-    enableBlobGarbageCollection = true
-  } = {}) {
-    super()
-
-    this.path = path
-
-    this.readOnly = readonly || readOnly
-    this.createIfMissing = createIfMissing
-    this.maxBackgroundJobs = maxBackgroundJobs
-    this.bytesPerSync = bytesPerSync
-
-    this.tableBlockSize = tableBlockSize
-    this.tableCacheIndexAndFilterBlocks = tableCacheIndexAndFilterBlocks
-    this.tablePinL0FilterAndIndexBlocksInCache = tablePinL0FilterAndIndexBlocksInCache
-    this.tableFormatVersion = tableFormatVersion
-
-    this.enableBlobFiles = enableBlobFiles
-    this.minBlobSize = minBlobSize
-    this.blobFileSize = blobFileSize
-    this.enableBlobGarbageCollection = enableBlobGarbageCollection
-
-    this._handle = Buffer.allocUnsafe(binding.sizeof_rocksdb_native_t)
-    this._status = new Int32Array(this._handle.buffer, this._handle.byteOffset + binding.offsetof_rocksdb_native_t_status, 1)
-    this._readBufferSize = DEFAULT_BUFFER_SIZE
-    this._writeBufferSize = DEFAULT_BUFFER_SIZE
-    this._statusResolve = null
-    this._flushes = []
-
-    this._nextReads = new ReadBatch()
-    this._nextWrites = new WriteBatch()
-
-    this._reads = null
-    this._writes = null
+    binding.batchDestroy(this._handle)
   }
 
-  async _open () {
-    binding.rocksdb_native_init(this._handle, DEFAULT_BUFFER_SIZE, this, this._onstatus, this._onbatch)
-
-    const opening = new Promise(resolve => { this._statusResolve = resolve })
-
-    const opts = new Uint32Array(13)
-
-    opts[0] = this.readOnly ? 1 : 0
-    opts[1] = this.createIfMissing ? 1 : 0
-    opts[2] = this.maxBackgroundJobs
-    opts[3] = this.bytesPerSync
-    opts[4] = this.tableBlockSize
-    opts[5] = this.tableCacheIndexAndFilterBlocks ? 1 : 0
-    opts[6] = this.tablePinL0FilterAndIndexBlocksInCache ? 1 : 0
-    opts[7] = this.tableFormatVersion
-    opts[8] = this.enableBlobFiles ? 1 : 0
-    opts[9] = this.minBlobSize
-    opts[10] = this.blobFileSize & 0xffffffff
-    opts[11] = Math.floor(this.blobFileSize / 0x100000000)
-    opts[12] = this.enableBlobGarbageCollection ? 1 : 0
-
-    binding.rocksdb_native_open(this._handle, this.path, opts)
-
-    const err = await opening
-    if (err) throw new Error(err)
+  destroy () {
+    if (this._destroying) return this._destroying
+    this._destroying = this._destroy()
+    return this._destroying
   }
 
-  async _close () {
-    await this.flush()
-
-    const closing = new Promise(resolve => { this._statusResolve = resolve })
-
-    binding.rocksdb_native_close(this._handle)
-
-    const err = await closing
-    if (err) throw new Error(err)
+  _enqueuePromise (resolve, reject) {
+    this._promises.push({ resolve, reject })
   }
 
-  _ensureReadBuffer (size) {
-    if (size <= this._readBufferSize) return
-    while (size > this._readBufferSize) this._readBufferSize *= 2
-    binding.rocksdb_native_set_read_buffer_size(this._handle, this._readBufferSize)
-  }
+  _resize () {
+    if (this._keys.length <= this._capacity) return
 
-  _ensureWriteBuffer (size) {
-    if (size <= this._writeBufferSize) return
-    while (size > this._writeBufferSize) this._writeBufferSize *= 2
-    binding.rocksdb_native_set_write_buffer_size(this._handle, this._writeBufferSize)
-  }
-
-  _onstatus (err) {
-    const resolve = this._statusResolve
-    this._statusResolve = null
-    resolve(err)
-  }
-
-  _onbatch (getValues) {
-    if (this._writes !== null) {
-      for (let i = 0; i < this._writes.promises.length; i++) {
-        const { resolve } = this._writes.promises[i]
-        resolve()
-      }
-      this._writes = null
+    while (this._keys.length > this._capacity) {
+      this._capacity *= 2
     }
 
-    if (this._reads !== null) {
-      for (let i = 0; i < this._reads.promises.length; i++) {
-        const { resolve } = this._reads.promises[i]
-        const buffer = getValues[i]
-        resolve(buffer === null ? null : Buffer.from(buffer, 0, buffer.byteLength))
-      }
-      this._reads = null
-    }
-
-    while (this._flushes.length > 0) this._flushes.shift()()
-
-    if (this._nextReads.keys.length || this._nextWrites.keys.length) {
-      this._flushMaybe()
-    }
+    binding.batchResize(this._handle, this._capacity)
   }
 
   _encodeKey (k) {
@@ -188,101 +120,102 @@ module.exports = class RocksDB extends ReadyResource {
     if (typeof v === 'string') return Buffer.from(v)
     return v
   }
+}
 
-  _flushMaybe () {
-    if (this._reads !== null || this._writes !== null) return
+module.exports = class RocksDB extends ReadyResource {
+  constructor (path, {
+    // default options, https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning
+    readOnly = false,
+    createIfMissing = true,
+    maxBackgroundJobs = 6,
+    bytesPerSync = 1048576,
+    // blob options, https://github.com/facebook/rocksdb/wiki/BlobDB
+    enableBlobFiles = false,
+    minBlobSize = 0,
+    blobFileSize = 0,
+    enableBlobGarbageCollection = true,
+    // (block) table options
+    tableBlockSize = 16384,
+    tableCacheIndexAndFilterBlocks = true,
+    tableFormatVersion = 4
+  } = {}) {
+    super()
 
-    this._ensureReadBuffer(this._nextReads.keys.length)
-    this._ensureWriteBuffer(this._nextWrites.keys.length)
+    this.path = path
 
-    this._reads = this._nextReads
-    this._writes = this._nextWrites
+    this.readOnly = readOnly
+    this.createIfMissing = createIfMissing
+    this.maxBackgroundJobs = maxBackgroundJobs
+    this.bytesPerSync = bytesPerSync
 
-    binding.rocksdb_native_batch(this._handle, this._reads.keys, this._writes.keys, this._writes.values)
+    this.enableBlobFiles = enableBlobFiles
+    this.minBlobSize = minBlobSize
+    this.blobFileSize = blobFileSize
+    this.enableBlobGarbageCollection = enableBlobGarbageCollection
 
-    if (this._reads.keys.length) {
-      this._nextReads = new ReadBatch()
-    } else {
-      this._reads = null
-    }
+    this.tableBlockSize = tableBlockSize
+    this.tableCacheIndexAndFilterBlocks = tableCacheIndexAndFilterBlocks
+    this.tableFormatVersion = tableFormatVersion
 
-    if (this._writes.keys.length) {
-      this._nextWrites = new WriteBatch()
-    } else {
-      this._writes = null
+    this._handle = binding.init()
+  }
+
+  async _open () {
+    const opts = new Uint32Array(16)
+
+    opts[0] = this.readOnly ? 1 : 0
+    opts[1] = this.createIfMissing ? 1 : 0
+    opts[2] = this.maxBackgroundJobs
+    opts[3] = this.bytesPerSync & 0xffffffff
+    opts[4] = Math.floor(this.bytesPerSync / 0x100000000)
+    opts[5] = 0
+    opts[6] = this.enableBlobFiles ? 1 : 0
+    opts[7] = this.minBlobSize & 0xffffffff
+    opts[8] = Math.floor(this.minBlobSize / 0x100000000)
+    opts[9] = this.blobFileSize & 0xffffffff
+    opts[10] = Math.floor(this.blobFileSize / 0x100000000)
+    opts[11] = this.enableBlobGarbageCollection ? 1 : 0
+    opts[12] = this.tableBlockSize & 0xffffffff
+    opts[13] = Math.floor(this.tableBlockSize / 0x100000000)
+    opts[14] = this.tableCacheIndexAndFilterBlocks ? 1 : 0
+    opts[15] = this.tableFormatVersion
+
+    const req = { resolve: null, reject: null, handle: null }
+
+    const promise = new Promise((resolve, reject) => {
+      req.resolve = resolve
+      req.reject = reject
+    })
+
+    req.handle = binding.open(this._handle, this.path, opts, req, onopen)
+
+    return promise
+
+    function onopen (err) {
+      if (err) req.reject(new Error(err))
+      else req.resolve()
     }
   }
 
-  flush () {
-    for (let i = 0; i < this._nextReads.promises.length; i++) {
-      this._nextReads.promises[i].reject(new Error('DB is closed'))
+  async _close () {
+    const req = { resolve: null, reject: null, handle: null }
+
+    const promise = new Promise((resolve, reject) => {
+      req.resolve = resolve
+      req.reject = reject
+    })
+
+    req.handle = binding.close(this._handle, req, onclose)
+
+    return promise
+
+    function onclose (err) {
+      if (err) req.reject(new Error(err))
+      else req.resolve()
     }
-    for (let i = 0; i < this._nextWrites.promises.length; i++) {
-      this._nextWrites.promises[i].reject(new Error('DB is closed'))
-    }
-
-    if (this._reads === null) return
-    return new Promise(resolve => { this._flushes.push(resolve) })
   }
 
-  async batch (ops) {
-    if (this.opened === false) await this.ready()
-    if (this.closing) throw new Error('DB is closed')
-    if (this.readOnly === true) throw new Error('DB is readOnly')
-    if (ops.length === 0) return
-
-    const all = new Array(ops.length)
-
-    for (let i = 0; i < ops.length; i++) {
-      const { key, value } = ops[i]
-      all[i] = this._nextWrites.queue(this._encodeKey(key), this._encodeValue(value || EMPTY))
-    }
-
-    this._flushMaybe()
-    return Promise.all(all)
-  }
-
-  async put (key, value) {
-    if (this.opened === false) await this.ready()
-    if (this.closing) throw new Error('DB is closed')
-    if (this.readOnly === true) throw new Error('DB is readOnly')
-
-    const prom = this._nextWrites.queue(this._encodeKey(key), this._encodeValue(value))
-    this._flushMaybe()
-    return prom
-  }
-
-  async del (key) {
-    if (this.opened === false) await this.ready()
-    if (this.closing) throw new Error('DB is closed')
-    if (this.readOnly === true) throw new Error('DB is readOnly')
-
-    const prom = this._nextWrites.queue(this._encodeKey(key), EMPTY)
-    this._flushMaybe()
-    return prom
-  }
-
-  async getBatch (keys) {
-    if (this.opened === false) await this.ready()
-    if (this.closing) throw new Error('DB is closed')
-    if (keys.length === 0) return
-
-    const all = new Array(keys.length)
-
-    for (let i = 0; i < keys.length; i++) {
-      all[i] = this._nextReads.queue(this._encodeKey(keys[i]))
-    }
-
-    this._flushMaybe()
-    return Promise.all(all)
-  }
-
-  async get (key) {
-    if (this.opened === false) await this.ready()
-    if (this.closing) throw new Error('DB is closed')
-
-    const prom = this._nextReads.queue(this._encodeKey(key))
-    this._flushMaybe()
-    return prom
+  batch ({ capacity = DEFAULT_BATCH_CAPACITY } = {}) {
+    return new Batch(this, capacity)
   }
 }
