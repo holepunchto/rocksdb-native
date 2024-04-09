@@ -1,9 +1,10 @@
 const test = require('brittle')
+const tmp = require('test-tmp')
 const b4a = require('b4a')
 const RocksDB = require('.')
 
 test('write + read', async (t) => {
-  const db = new RocksDB('./test/fixtures/test.db')
+  const db = new RocksDB(await tmp(t))
   await db.ready()
 
   const batch = db.batch()
