@@ -330,7 +330,7 @@ rocksdb_native_batch_resize (js_env_t *env, js_callback_info_t *info) {
   js_value_t *handle;
 
   rocksdb_native_batch_t *batch;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_batch_t), (void **) &batch, &handle);
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &batch, NULL);
   assert(err == 0);
 
   uint32_t capacity;
@@ -346,7 +346,7 @@ rocksdb_native_batch_resize (js_env_t *env, js_callback_info_t *info) {
 }
 
 static inline int
-rocksdb_native__get_slices (js_env_t *env, js_value_t *arr, uint32_t len, rocksdb_slice_t **result) {
+rocksdb_native__get_slices (js_env_t *env, js_value_t *arr, uint32_t len, rocksdb_slice_t *result) {
   int err;
 
   for (uint32_t i = 0; i < len; i++) {
@@ -354,7 +354,9 @@ rocksdb_native__get_slices (js_env_t *env, js_value_t *arr, uint32_t len, rocksd
     err = js_get_element(env, arr, i, &value);
     assert(err == 0);
 
-    err = js_get_typedarray_info(env, value, NULL, (void **) &result[i]->data, &result[i]->len, NULL, NULL);
+    rocksdb_slice_t *slice = &result[i];
+
+    err = js_get_typedarray_info(env, value, NULL, (void **) &slice->data, &slice->len, NULL, NULL);
     assert(err == 0);
   }
 
@@ -457,7 +459,7 @@ rocksdb_native_read (js_env_t *env, js_callback_info_t *info) {
 
   batch->handle->len = len;
 
-  err = rocksdb_native__get_slices(env, argv[2], len, &batch->handle->keys);
+  err = rocksdb_native__get_slices(env, argv[2], len, batch->handle->keys);
   assert(err == 0);
 
   err = rocksdb_read(&db->handle, batch->handle, rocksdb_native__on_read);
@@ -543,10 +545,10 @@ rocksdb_native_write (js_env_t *env, js_callback_info_t *info) {
 
   batch->handle->len = len;
 
-  err = rocksdb_native__get_slices(env, argv[2], len, &batch->handle->keys);
+  err = rocksdb_native__get_slices(env, argv[2], len, batch->handle->keys);
   assert(err == 0);
 
-  err = rocksdb_native__get_slices(env, argv[3], len, &batch->handle->values);
+  err = rocksdb_native__get_slices(env, argv[3], len, batch->handle->values);
   assert(err == 0);
 
   err = rocksdb_write(&db->handle, batch->handle, rocksdb_native__on_write);

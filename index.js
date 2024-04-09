@@ -58,6 +58,8 @@ class Batch {
   }
 
   add (key, value = EMPTY) {
+    if (this._request) throw new Error('Request already in progress')
+
     const promise = new Promise(this._enqueuePromise)
 
     this._keys.push(this._encodeKey(key))
@@ -69,6 +71,7 @@ class Batch {
 
   read () {
     if (this._request) throw new Error('Request already in progress')
+
     this._request = new Promise((resolve) => { this._resolveRequest = resolve })
 
     binding.read(this._db._handle, this._handle, this._keys, this._onread)
@@ -78,6 +81,7 @@ class Batch {
 
   write () {
     if (this._request) throw new Error('Request already in progress')
+
     this._request = new Promise((resolve) => { this._resolveRequest = resolve })
 
     binding.write(this._db._handle, this._handle, this._keys, this._values, this._onwrite)
