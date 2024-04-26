@@ -38,7 +38,7 @@ class Batch {
       const err = errors[i]
 
       if (err) promise.reject(new Error(err))
-      else promise.resolve(b4a.from(values[i]))
+      else promise.resolve(values[i].byteLength === 0 ? null : b4a.from(values[i]))
     }
 
     this._onfinished()
@@ -51,7 +51,7 @@ class Batch {
       const err = errors[i]
 
       if (err) promise.reject(new Error(err))
-      else promise.resolve(this._values[i])
+      else promise.resolve(this._values[i].byteLength === 0 ? null : this._values[i])
     }
 
     this._onfinished()
@@ -145,6 +145,7 @@ class Batch {
   }
 
   _encodeValue (v) {
+    if (v === null) return EMPTY
     if (typeof v === 'string') return Buffer.from(v)
     return v
   }

@@ -73,7 +73,7 @@ test('read missing', async (t) => {
 
   const p = batch.add('hello')
   await batch.read()
-  t.alike(await p, b4a.alloc(0))
+  t.alike(await p, null)
 
   batch.destroy()
 
