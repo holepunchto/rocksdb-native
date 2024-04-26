@@ -2,6 +2,14 @@ import Rocks from './index.js'
 
 const db = new Rocks('./example.db')
 
-await db.put('hello', 'world')
+const b = db.batch()
 
-console.log(await db.get('hello'))
+b.add('hello', 'world')
+await b.write()
+
+const b1 = db.batch()
+const p = b.add('hello')
+
+b.read()
+
+console.log(await p)
