@@ -16,7 +16,7 @@ class Batch {
     this._request = null
     this._resolveRequest = null
     this._destroying = null
-    this._handle = binding.batchInit(capacity, this)
+    this._handle = db.opened === true ? binding.batchInit(capacity, this) : null
   }
 
   _onfinished () {
@@ -59,6 +59,7 @@ class Batch {
 
   add (key, value = EMPTY) {
     if (this._request) throw new Error('Request already in progress')
+    if (this._db.opened === false) return this._openAndAdd(key, value)
 
     const promise = new Promise(this._enqueuePromise)
 
@@ -71,6 +72,7 @@ class Batch {
 
   read () {
     if (this._request) throw new Error('Request already in progress')
+    if (this._db.opened === false) return this._openAndRead()
 
     this._request = new Promise((resolve) => { this._resolveRequest = resolve })
 
@@ -81,6 +83,7 @@ class Batch {
 
   write () {
     if (this._request) throw new Error('Request already in progress')
+    if (this._db.opened === false) return this._openAndWrite()
 
     this._request = new Promise((resolve) => { this._resolveRequest = resolve })
 
@@ -90,6 +93,7 @@ class Batch {
   }
 
   async _destroy () {
+    if (this._db.opened === false) await this._db.ready()
     await this._request
 
     binding.batchDestroy(this._handle)
@@ -99,6 +103,26 @@ class Batch {
     if (this._destroying) return this._destroying
     this._destroying = this._destroy()
     return this._destroying
+  }
+
+  async _setHandle () {
+    await this._db.ready()
+    if (this._handle === null) this._handle = binding.batchInit(this._capacity, this)
+  }
+
+  async _openAndAdd (key, value) {
+    await this._setHandle()
+    return this.add(key, value)
+  }
+
+  async _openAndRead () {
+    await this._setHandle()
+    return this.read()
+  }
+
+  async _openAndWrite () {
+    await this._setHandle()
+    return this.write()
   }
 
   _enqueuePromise (resolve, reject) {
@@ -223,3 +247,5 @@ module.exports = class RocksDB extends ReadyResource {
     return new Batch(this, capacity)
   }
 }
+
+function noop () {}
