@@ -29,12 +29,13 @@ class Batch {
     this._request = null
     this._resolveRequest = null
 
-    resolve()
+    if (resolve !== null) resolve()
   }
 
   _onread (errors, values) {
     for (let i = 0, n = this._promises.length; i < n; i++) {
       const promise = this._promises[i]
+      if (promise === null) continue
 
       const err = errors[i]
 
@@ -48,6 +49,7 @@ class Batch {
   _onwrite (errors) {
     for (let i = 0, n = this._promises.length; i < n; i++) {
       const promise = this._promises[i]
+      if (promise === null) continue
 
       const err = errors[i]
 
@@ -58,9 +60,24 @@ class Batch {
     this._onfinished()
   }
 
+  _resize () {
+    if (this._keys.length <= this._capacity) return
+
+    while (this._keys.length > this._capacity) {
+      this._capacity *= 2
+    }
+
+    if (this._handle !== null) binding.batchResize(this._handle, this._capacity)
+  }
+
+  async ready () {
+    if (this._db.opened === false) await this._db.ready()
+
+    if (this._handle === null) this._handle = binding.batchInit(this._capacity, this)
+  }
+
   add (key, value = EMPTY) {
     if (this._request) throw new Error('Request already in progress')
-    if (this._db.opened === false) return this._openAndAdd(key, value)
 
     const promise = new Promise(this._enqueuePromise)
 
@@ -71,73 +88,77 @@ class Batch {
     return promise
   }
 
+  tryAdd (key, value = EMPTY) {
+    if (this._request) throw new Error('Request already in progress')
+
+    this._keys.push(this._encodeKey(key))
+    this._values.push(this._encodeValue(value))
+    this._promises.push(null)
+    this._resize()
+  }
+
   read () {
     if (this._request) throw new Error('Request already in progress')
-    if (this._db.opened === false) return this._openAndRead()
 
     this._request = new Promise((resolve) => { this._resolveRequest = resolve })
-
-    binding.read(this._db._handle, this._handle, this._keys, this._onread)
+    this._read()
 
     return this._request
+  }
+
+  tryRead () {
+    if (this._request) throw new Error('Request already in progress')
+
+    this._request = true
+    this._read()
+  }
+
+  async _read () {
+    if (this._db.opened === false) await this.ready()
+
+    binding.read(this._db._handle, this._handle, this._keys, this._onread)
   }
 
   write () {
     if (this._request) throw new Error('Request already in progress')
-    if (this._db.opened === false) return this._openAndWrite()
 
     this._request = new Promise((resolve) => { this._resolveRequest = resolve })
-
-    binding.write(this._db._handle, this._handle, this._keys, this._values, this._onwrite)
+    this._write()
 
     return this._request
   }
 
+  tryWrite () {
+    if (this._request) throw new Error('Request already in progress')
+
+    this._request = true
+    this._write()
+  }
+
+  async _write () {
+    if (this._db.opened === false) await this.ready()
+
+    binding.write(this._db._handle, this._handle, this._keys, this._values, this._onwrite)
+  }
+
+  destroy () {
+    if (this._destroying) return this._destroying
+
+    this._destroying = this._destroy()
+
+    return this._destroying
+  }
+
   async _destroy () {
-    if (this._db.opened === false) await this._db.ready()
+    if (this._db.opened === false) await this.ready()
+
     await this._request
 
     binding.batchDestroy(this._handle)
   }
 
-  destroy () {
-    if (this._destroying) return this._destroying
-    this._destroying = this._destroy()
-    return this._destroying
-  }
-
-  async _setHandle () {
-    await this._db.ready()
-    if (this._handle === null) this._handle = binding.batchInit(this._capacity, this)
-  }
-
-  async _openAndAdd (key, value) {
-    await this._setHandle()
-    return this.add(key, value)
-  }
-
-  async _openAndRead () {
-    await this._setHandle()
-    return this.read()
-  }
-
-  async _openAndWrite () {
-    await this._setHandle()
-    return this.write()
-  }
-
   _enqueuePromise (resolve, reject) {
     this._promises.push({ resolve, reject })
-  }
-
-  _resize () {
-    if (this._keys.length <= this._capacity) return
-
-    while (this._keys.length > this._capacity) {
-      this._capacity *= 2
-    }
-
-    binding.batchResize(this._handle, this._capacity)
   }
 
   _encodeKey (k) {
