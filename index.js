@@ -1,3 +1,4 @@
+/* global Bare */
 const ReadyResource = require('ready-resource')
 const b4a = require('b4a')
 const binding = require('./binding')
@@ -151,7 +152,7 @@ class Batch {
   }
 }
 
-module.exports = class RocksDB extends ReadyResource {
+const RocksDB = module.exports = class RocksDB extends ReadyResource {
   constructor (path, {
     // default options, https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning
     readOnly = false,
@@ -218,6 +219,8 @@ module.exports = class RocksDB extends ReadyResource {
 
     req.handle = binding.open(this._handle, this.path, opts, req, onopen)
 
+    RocksDB._instances.add(this)
+
     return promise
 
     function onopen (err) {
@@ -236,6 +239,8 @@ module.exports = class RocksDB extends ReadyResource {
 
     req.handle = binding.close(this._handle, req, onclose)
 
+    RocksDB._instances.delete(this)
+
     return promise
 
     function onclose (err) {
@@ -247,6 +252,12 @@ module.exports = class RocksDB extends ReadyResource {
   batch ({ capacity = DEFAULT_BATCH_CAPACITY } = {}) {
     return new Batch(this, capacity)
   }
+
+  static _instances = new Set()
 }
 
-function noop () {}
+Bare.on('exit', async () => {
+  for (const db of RocksDB._instances) {
+    await db.close()
+  }
+})
