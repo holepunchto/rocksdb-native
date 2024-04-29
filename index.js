@@ -114,7 +114,7 @@ class Batch {
   }
 
   async _read () {
-    if (this._db.opened === false) await this.ready()
+    if (this._handle === null) await this.ready()
 
     binding.read(this._db._handle, this._handle, this._keys, this._onread)
   }
@@ -136,7 +136,7 @@ class Batch {
   }
 
   async _write () {
-    if (this._db.opened === false) await this.ready()
+    if (this._handle === null) await this.ready()
 
     binding.write(this._db._handle, this._handle, this._keys, this._values, this._onwrite)
   }
@@ -150,7 +150,7 @@ class Batch {
   }
 
   async _destroy () {
-    if (this._db.opened === false) await this.ready()
+    if (this._handle === null) await this.ready()
 
     await this._request
 
