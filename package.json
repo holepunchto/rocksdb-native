@@ -10,15 +10,7 @@
     "binding.js",
     "CMakeLists.txt",
     "prebuilds",
-    "vendor/rocksdb.cc",
-    "vendor/rocksdb.gyp",
-    "vendor/rocksdb/**/CMakeLists.txt",
-    "vendor/rocksdb/**/*.cmake",
-    "vendor/rocksdb/**/*.cmake.in",
-    "vendor/rocksdb/**/*.cc",
-    "vendor/rocksdb/**/*.cc.in",
-    "vendor/rocksdb/**/*.h",
-    "vendor/rocksdb/**/*.pc.in"
+    "vendor/librocksdb"
   ],
   "addon": true,
   "scripts": {

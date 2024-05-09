@@ -327,8 +327,6 @@ rocksdb_native_batch_resize (js_env_t *env, js_callback_info_t *info) {
 
   assert(argc == 2);
 
-  js_value_t *handle;
-
   rocksdb_native_batch_t *batch;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &batch, NULL);
   assert(err == 0);
@@ -342,7 +340,7 @@ rocksdb_native_batch_resize (js_env_t *env, js_callback_info_t *info) {
 
   batch->handle->data = (void *) batch;
 
-  return handle;
+  return NULL;
 }
 
 static inline int
@@ -462,7 +460,7 @@ rocksdb_native_read (js_env_t *env, js_callback_info_t *info) {
   err = rocksdb_native__get_slices(env, argv[2], len, batch->handle->keys);
   assert(err == 0);
 
-  err = rocksdb_read(&db->handle, batch->handle, rocksdb_native__on_read);
+  err = rocksdb_batch_read(&db->handle, batch->handle, rocksdb_native__on_read);
   assert(err == 0);
 
   return NULL;
@@ -551,7 +549,7 @@ rocksdb_native_write (js_env_t *env, js_callback_info_t *info) {
   err = rocksdb_native__get_slices(env, argv[3], len, batch->handle->values);
   assert(err == 0);
 
-  err = rocksdb_write(&db->handle, batch->handle, rocksdb_native__on_write);
+  err = rocksdb_batch_write(&db->handle, batch->handle, rocksdb_native__on_write);
   assert(err == 0);
 
   return NULL;
