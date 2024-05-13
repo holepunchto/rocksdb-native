@@ -17,7 +17,7 @@ class Batch {
     this._request = null
     this._resolveRequest = null
     this._destroying = null
-    this._handle = db.opened === true ? binding.batchInit(capacity, this) : null
+    this._handle = db.opened === true ? binding.batchInit(db._handle, capacity, this) : null
   }
 
   _onfinished () {
@@ -73,7 +73,7 @@ class Batch {
   async ready () {
     if (this._db.opened === false) await this._db.ready()
 
-    if (this._handle === null) this._handle = binding.batchInit(this._capacity, this)
+    if (this._handle === null) this._handle = binding.batchInit(this._db._handle, this._capacity, this)
   }
 
   add (key, value = EMPTY) {
@@ -116,7 +116,7 @@ class Batch {
   async _read () {
     if (this._handle === null) await this.ready()
 
-    binding.read(this._db._handle, this._handle, this._keys, this._onread)
+    binding.batchRead(this._handle, this._keys, this._onread)
   }
 
   write () {
@@ -138,7 +138,7 @@ class Batch {
   async _write () {
     if (this._handle === null) await this.ready()
 
-    binding.write(this._db._handle, this._handle, this._keys, this._values, this._onwrite)
+    binding.batchWrite(this._handle, this._keys, this._values, this._onwrite)
   }
 
   destroy () {
