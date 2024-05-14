@@ -2,6 +2,7 @@
 const ReadyResource = require('ready-resource')
 const binding = require('./binding')
 const Batch = require('./lib/batch')
+const Iterator = require('./lib/iterator')
 
 const RocksDB = module.exports = class RocksDB extends ReadyResource {
   constructor (path, {
@@ -102,6 +103,10 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
 
   batch (opts) {
     return new Batch(this, opts)
+  }
+
+  iterator (start, end, opts) {
+    return new Iterator(this, start, end, opts)
   }
 
   static _instances = new Set()

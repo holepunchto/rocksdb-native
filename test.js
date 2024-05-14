@@ -26,8 +26,6 @@ test('write + read', async (t) => {
     t.alike(await p, b4a.from('world'))
   }
 
-  batch.destroy()
-
   await db.close()
 })
 
@@ -60,8 +58,6 @@ test('write + read multiple', async (t) => {
     t.alike(await Promise.all(p), new Array(100).fill(0).map((_, i) => b4a.from(`${i}`)))
   }
 
-  batch.destroy()
-
   await db.close()
 })
 
@@ -75,7 +71,33 @@ test('read missing', async (t) => {
   await batch.read()
   t.alike(await p, null)
 
-  batch.destroy()
+  await db.close()
+})
+
+test('prefix iterator', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.batch()
+
+  batch.add('aa', 'aa')
+  batch.add('ab', 'ab')
+  batch.add('ba', 'ba')
+  batch.add('bb', 'bb')
+  batch.add('ac', 'ac')
+  await batch.write()
+
+  const entries = []
+
+  for await (const entry of db.iterator('a', 'b')) {
+    entries.push(entry)
+  }
+
+  t.alike(entries, [
+    { key: b4a.from('aa'), value: b4a.from('aa') },
+    { key: b4a.from('ab'), value: b4a.from('ab') },
+    { key: b4a.from('ac'), value: b4a.from('ac') }
+  ])
 
   await db.close()
 })
