@@ -9,6 +9,7 @@
     "binding.gyp",
     "binding.js",
     "CMakeLists.txt",
+    "lib",
     "prebuilds",
     "vendor/librocksdb"
   ],
