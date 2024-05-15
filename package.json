@@ -15,7 +15,7 @@
   ],
   "addon": true,
   "scripts": {
-    "test": "standard && brittle test.js"
+    "test": "standard && bare test.js"
   },
   "repository": {
     "type": "git",
