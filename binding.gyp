@@ -18,5 +18,13 @@
         'defines': ['NDEBUG'],
       },
     },
+    'conditions': [
+      ['OS=="win"', {
+        'libraries': [
+          'shlwapi.lib',
+          'rpcrt4.lib',
+        ],
+      }],
+    ],
   }],
 }
