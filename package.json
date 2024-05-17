@@ -15,7 +15,8 @@
   ],
   "addon": true,
   "scripts": {
-    "test": "standard && bare test.js"
+    "test": "standard && bare test.js",
+    "install": "node-gyp-build"
   },
   "repository": {
     "type": "git",
