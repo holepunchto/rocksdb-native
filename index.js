@@ -112,8 +112,10 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   static _instances = new Set()
 }
 
-Bare.on('exit', async () => {
-  for (const db of RocksDB._instances) {
-    await db.close()
-  }
-})
+if (typeof Bare !== 'undefined') {
+  Bare.on('exit', async () => {
+    for (const db of RocksDB._instances) {
+      await db.close()
+    }
+  })
+}
