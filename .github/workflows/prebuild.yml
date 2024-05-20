@@ -27,7 +27,7 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
-    - run: npm install -g bare-runtime bare-dev prebuildify
+    - run: npm install -g bare-runtime bare-dev prebuildify node-gyp
     - run: npm install --ignore-scripts
     - run: bare-dev install --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
     - run: prebuildify --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
