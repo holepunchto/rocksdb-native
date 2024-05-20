@@ -27,9 +27,10 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
-    - run: npm install -g bare-runtime bare-dev
+    - run: npm install -g bare-runtime bare-dev prebuildify
     - run: npm install --ignore-scripts
     - run: bare-dev install --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+    - run: prebuildify --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.platform }}-${{ matrix.arch }}
