@@ -31,5 +31,5 @@ jobs:
         node-version: lts/*
     - run: npm install -g bare-runtime bare-dev
     - run: npm install --ignore-scripts
-    - run: bare-dev install --bare --node --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --debug
+    - run: bare-dev install --bare --node --no-recursive --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --debug
     - run: npm test
