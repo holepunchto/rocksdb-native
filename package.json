@@ -1,8 +1,11 @@
 {
   "name": "rocksdb-native",
   "version": "0.1.1",
-  "description": "JavaScript bindings for RocksDB",
-  "main": "index.js",
+  "description": "librocksdb bindings for JavaScript",
+  "exports": {
+    ".": "./index.js",
+    "./package": "./package.json"
+  },
   "files": [
     "index.js",
     "binding.c",
