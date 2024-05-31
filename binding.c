@@ -51,8 +51,6 @@ typedef struct {
   rocksdb_slice_t *keys;
   rocksdb_slice_t *values;
 
-  size_t capacity;
-
   js_env_t *env;
   js_ref_t *ctx;
   js_ref_t *on_open;
@@ -349,8 +347,6 @@ rocksdb_native_iterator_buffer (js_env_t *env, js_callback_info_t *info) {
   err = js_create_arraybuffer(env, 2 * capacity * sizeof(rocksdb_slice_t), (void **) &data, &handle);
   assert(err == 0);
 
-  iterator->capacity = capacity;
-
   size_t offset = 0;
 
   iterator->keys = (rocksdb_slice_t *) &data[offset];
@@ -404,27 +400,37 @@ static js_value_t *
 rocksdb_native_iterator_open (js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 3;
-  js_value_t *argv[3];
+  size_t argc = 6;
+  js_value_t *argv[6];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 3);
+  assert(argc == 6);
 
   rocksdb_native_iterator_t *iterator;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &iterator, NULL);
   assert(err == 0);
 
-  rocksdb_slice_t start;
-  err = js_get_typedarray_info(env, argv[1], NULL, (void **) &start.data, &start.len, NULL, NULL);
+  rocksdb_range_t range;
+
+  err = js_get_typedarray_info(env, argv[1], NULL, (void **) &range.gt.data, &range.gt.len, NULL, NULL);
   assert(err == 0);
 
-  rocksdb_slice_t end;
-  err = js_get_typedarray_info(env, argv[2], NULL, (void **) &end.data, &end.len, NULL, NULL);
+  err = js_get_typedarray_info(env, argv[2], NULL, (void **) &range.gte.data, &range.gte.len, NULL, NULL);
   assert(err == 0);
 
-  err = rocksdb_iterator_open(&iterator->handle, start, end, rocksdb_native__on_iterator_open);
+  err = js_get_typedarray_info(env, argv[3], NULL, (void **) &range.lt.data, &range.lt.len, NULL, NULL);
+  assert(err == 0);
+
+  err = js_get_typedarray_info(env, argv[4], NULL, (void **) &range.lte.data, &range.lte.len, NULL, NULL);
+  assert(err == 0);
+
+  bool reverse;
+  err = js_get_value_bool(env, argv[5], &reverse);
+  assert(err == 0);
+
+  err = rocksdb_iterator_open(&iterator->handle, range, reverse, rocksdb_native__on_iterator_open);
   assert(err == 0);
 
   return NULL;
@@ -562,19 +568,23 @@ static js_value_t *
 rocksdb_native_iterator_read (js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 1;
-  js_value_t *argv[1];
+  size_t argc = 2;
+  js_value_t *argv[2];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 1);
+  assert(argc == 2);
 
   rocksdb_native_iterator_t *iterator;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &iterator, NULL);
   assert(err == 0);
 
-  err = rocksdb_iterator_read(&iterator->handle, iterator->keys, iterator->values, iterator->capacity, rocksdb_native__on_iterator_read);
+  uint32_t capacity;
+  err = js_get_value_uint32(env, argv[1], &capacity);
+  assert(err == 0);
+
+  err = rocksdb_iterator_read(&iterator->handle, iterator->keys, iterator->values, capacity, rocksdb_native__on_iterator_read);
   assert(err == 0);
 
   return NULL;

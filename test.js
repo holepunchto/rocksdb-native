@@ -101,3 +101,57 @@ test('prefix iterator', async (t) => {
 
   await db.close()
 })
+
+test('prefix iterator, reverse', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.batch()
+
+  batch.add('aa', 'aa')
+  batch.add('ab', 'ab')
+  batch.add('ba', 'ba')
+  batch.add('bb', 'bb')
+  batch.add('ac', 'ac')
+  await batch.write()
+
+  const entries = []
+
+  for await (const entry of db.iterator('a', 'b', { reverse: true })) {
+    entries.push(entry)
+  }
+
+  t.alike(entries, [
+    { key: b4a.from('ac'), value: b4a.from('ac') },
+    { key: b4a.from('ab'), value: b4a.from('ab') },
+    { key: b4a.from('aa'), value: b4a.from('aa') }
+  ])
+
+  await db.close()
+})
+
+test('prefix iterator, reverse with limit', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.batch()
+
+  batch.add('aa', 'aa')
+  batch.add('ab', 'ab')
+  batch.add('ba', 'ba')
+  batch.add('bb', 'bb')
+  batch.add('ac', 'ac')
+  await batch.write()
+
+  const entries = []
+
+  for await (const entry of db.iterator('a', 'b', { reverse: true, limit: 1 })) {
+    entries.push(entry)
+  }
+
+  t.alike(entries, [
+    { key: b4a.from('ac'), value: b4a.from('ac') }
+  ])
+
+  await db.close()
+})
