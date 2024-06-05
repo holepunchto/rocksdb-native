@@ -74,6 +74,52 @@ test('read missing', async (t) => {
   await db.close()
 })
 
+test('delete range', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  {
+    const batch = db.batch()
+
+    batch.add('aa', 'aa')
+    batch.add('ab', 'ab')
+    batch.add('ba', 'ba')
+    batch.add('bb', 'bb')
+    batch.add('bc', 'bc')
+    batch.add('ac', 'ac')
+
+    await batch.write()
+  }
+
+  await db.deleteRange('a', 'b')
+
+  {
+    const batch = db.batch()
+
+    const p = []
+
+    p.push(batch.add('aa'))
+    p.push(batch.add('ab'))
+    p.push(batch.add('ac'))
+    p.push(batch.add('ba'))
+    p.push(batch.add('bb'))
+    p.push(batch.add('bc'))
+
+    await batch.read()
+
+    t.alike(await Promise.all(p), [
+      null,
+      null,
+      null,
+      Buffer.from('ba'),
+      Buffer.from('bb'),
+      Buffer.from('bc')
+    ])
+  }
+
+  await db.close()
+})
+
 test('prefix iterator', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()

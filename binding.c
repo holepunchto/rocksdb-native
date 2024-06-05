@@ -46,6 +46,14 @@ typedef struct {
 } rocksdb_native_close_t;
 
 typedef struct {
+  rocksdb_delete_range_t handle;
+
+  js_env_t *env;
+  js_ref_t *ctx;
+  js_ref_t *on_status;
+} rocksdb_native_delete_range_t;
+
+typedef struct {
   rocksdb_iterator_t handle;
 
   rocksdb_slice_t *keys;
@@ -273,6 +281,101 @@ rocksdb_native_close (js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
 
   err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_close);
+  assert(err == 0);
+
+  return handle;
+}
+
+static void
+rocksdb_native__on_delete_range (rocksdb_delete_range_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  rocksdb_native_delete_range_t *req = (rocksdb_native_delete_range_t *) handle->data;
+
+  js_env_t *env = req->env;
+
+  js_handle_scope_t *scope;
+  err = js_open_handle_scope(env, &scope);
+  assert(err == 0);
+
+  js_value_t *ctx;
+  err = js_get_reference_value(env, req->ctx, &ctx);
+  assert(err == 0);
+
+  js_value_t *cb;
+  err = js_get_reference_value(env, req->on_status, &cb);
+  assert(err == 0);
+
+  js_value_t *error;
+
+  if (req->handle.error) {
+    err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
+    assert(err == 0);
+  } else {
+    err = js_get_null(env, &error);
+    assert(err == 0);
+  }
+
+  js_call_function(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
+
+  err = js_close_handle_scope(env, scope);
+  assert(err == 0);
+
+  err = js_delete_reference(env, req->on_status);
+  assert(err == 0);
+
+  err = js_delete_reference(env, req->ctx);
+  assert(err == 0);
+}
+
+static js_value_t *
+rocksdb_native_delete_range (js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  size_t argc = 7;
+  js_value_t *argv[7];
+
+  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  assert(err == 0);
+
+  assert(argc == 7);
+
+  rocksdb_native_t *db;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
+  assert(err == 0);
+
+  js_value_t *handle;
+
+  rocksdb_native_delete_range_t *req;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_delete_range_t), (void **) &req, &handle);
+  assert(err == 0);
+
+  req->env = env;
+  req->handle.data = (void *) req;
+
+  rocksdb_range_t range;
+
+  err = js_get_typedarray_info(env, argv[1], NULL, (void **) &range.gt.data, &range.gt.len, NULL, NULL);
+  assert(err == 0);
+
+  err = js_get_typedarray_info(env, argv[2], NULL, (void **) &range.gte.data, &range.gte.len, NULL, NULL);
+  assert(err == 0);
+
+  err = js_get_typedarray_info(env, argv[3], NULL, (void **) &range.lt.data, &range.lt.len, NULL, NULL);
+  assert(err == 0);
+
+  err = js_get_typedarray_info(env, argv[4], NULL, (void **) &range.lte.data, &range.lte.len, NULL, NULL);
+  assert(err == 0);
+
+  err = js_create_reference(env, argv[5], 1, &req->ctx);
+  assert(err == 0);
+
+  err = js_create_reference(env, argv[6], 1, &req->on_status);
+  assert(err == 0);
+
+  err = rocksdb_delete_range(&db->handle, &req->handle, range, rocksdb_native__on_delete_range);
   assert(err == 0);
 
   return handle;
@@ -866,6 +969,7 @@ rocksdb_native_exports (js_env_t *env, js_value_t *exports) {
   V("init", rocksdb_native_init)
   V("open", rocksdb_native_open)
   V("close", rocksdb_native_close)
+  V("deleteRange", rocksdb_native_delete_range)
 
   V("iteratorInit", rocksdb_native_iterator_init)
   V("iteratorBuffer", rocksdb_native_iterator_buffer)
