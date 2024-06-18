@@ -201,3 +201,48 @@ test('prefix iterator, reverse with limit', async (t) => {
 
   await db.close()
 })
+
+test('delete', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  {
+    const batch = db.batch()
+
+    const p1 = batch.add('hello', 'world')
+    const p2 = batch.add('next', 'value')
+    const p3 = batch.add('another', 'entry')
+
+    await batch.write()
+
+    t.alike(await p1, b4a.from('world'))
+    t.alike(await p2, b4a.from('value'))
+    t.alike(await p3, b4a.from('entry'))
+  }
+
+  {
+    const batch = db.batch()
+
+    const p1 = batch.add('hello')
+    const p2 = batch.add('next')
+    const p3 = batch.add('another')
+
+    await t.execution(batch.delete())
+  }
+
+  {
+    const batch = db.batch()
+
+    const p1 = batch.add('hello')
+    const p2 = batch.add('next')
+    const p3 = batch.add('another')
+
+    await batch.read()
+
+    t.alike(await p1, null)
+    t.alike(await p2, null)
+    t.alike(await p3, null)
+
+  }
+  await db.close()
+})
