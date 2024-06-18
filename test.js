@@ -223,9 +223,9 @@ test('delete', async (t) => {
   {
     const batch = db.batch()
 
-    const p1 = batch.add('hello')
-    const p2 = batch.add('next')
-    const p3 = batch.add('another')
+    batch.add('hello')
+    batch.add('next')
+    batch.add('another')
 
     await t.execution(batch.delete())
   }
@@ -242,7 +242,7 @@ test('delete', async (t) => {
     t.alike(await p1, null)
     t.alike(await p2, null)
     t.alike(await p3, null)
-
   }
+
   await db.close()
 })
