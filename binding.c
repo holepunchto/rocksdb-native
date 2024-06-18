@@ -953,6 +953,81 @@ rocksdb_native_batch_write (js_env_t *env, js_callback_info_t *info) {
   return NULL;
 }
 
+static void
+rocksdb_native__on_batch_delete (rocksdb_batch_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  rocksdb_native_batch_t *batch = (rocksdb_native_batch_t *) handle->data;
+
+  js_env_t *env = batch->env;
+
+  js_handle_scope_t *scope;
+  err = js_open_handle_scope(env, &scope);
+  assert(err == 0);
+
+  js_value_t *error;
+
+  if (batch->handle.error) {
+    err = js_create_string_utf8(env, (utf8_t *) batch->handle.error, -1, &error);
+    assert(err == 0);
+  } else {
+    err = js_get_null(env, &error);
+    assert(err == 0);
+  }
+
+  js_value_t *ctx;
+  err = js_get_reference_value(env, batch->ctx, &ctx);
+  assert(err == 0);
+
+  js_value_t *cb;
+  err = js_get_reference_value(env, batch->on_status, &cb);
+  assert(err == 0);
+
+  js_call_function(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
+
+  err = js_close_handle_scope(env, scope);
+  assert(err == 0);
+}
+
+static js_value_t *
+rocksdb_native_batch_delete (js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  size_t argc = 4;
+  js_value_t *argv[4];
+
+  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  assert(err == 0);
+
+  assert(argc == 4);
+
+  rocksdb_native_batch_t *batch;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &batch, NULL);
+  assert(err == 0);
+
+  js_value_t *handle;
+
+  uint32_t len;
+  err = js_get_array_length(env, argv[1], &len);
+  assert(err == 0);
+
+  err = js_create_reference(env, argv[3], 1, &batch->on_status);
+  assert(err == 0);
+
+  err = rocksdb_native__get_slices(env, argv[1], len, batch->keys);
+  assert(err == 0);
+
+  err = rocksdb_native__get_slices(env, argv[2], len, batch->values);
+  assert(err == 0);
+
+  err = rocksdb_batch_delete(&batch->handle, batch->keys, batch->values, len, rocksdb_native__on_batch_delete);
+  assert(err == 0);
+
+  return handle;
+}
+
 static js_value_t *
 rocksdb_native_exports (js_env_t *env, js_value_t *exports) {
   int err;
@@ -981,6 +1056,7 @@ rocksdb_native_exports (js_env_t *env, js_value_t *exports) {
   V("batchBuffer", rocksdb_native_batch_buffer)
   V("batchRead", rocksdb_native_batch_read)
   V("batchWrite", rocksdb_native_batch_write)
+  V("batchDelete", rocksdb_native_batch_delete)
 #undef V
 
   return exports;
