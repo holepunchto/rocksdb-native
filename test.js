@@ -117,6 +117,40 @@ test('delete range', async (t) => {
   await db.close()
 })
 
+test('delete range, end does not exist', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  {
+    const batch = db.write()
+    batch.put('aa', 'aa')
+    batch.put('ab', 'ab')
+    batch.put('ac', 'ac')
+    await batch.flush()
+  }
+  {
+    const batch = db.write()
+    batch.deleteRange('a', 'b')
+    await batch.flush()
+  }
+  {
+    const batch = db.read()
+    const p = []
+    p.push(batch.get('aa'))
+    p.push(batch.get('ab'))
+    p.push(batch.get('ac'))
+    await batch.flush()
+
+    t.alike(await Promise.all(p), [
+      null,
+      null,
+      null
+    ])
+  }
+
+  await db.close()
+})
+
 test('prefix iterator', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
