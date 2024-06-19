@@ -1,11 +1,8 @@
 /* global Bare */
 const ReadyResource = require('ready-resource')
-const b4a = require('b4a')
 const binding = require('./binding')
-const Batch = require('./lib/batch')
+const { ReadBatch, WriteBatch } = require('./lib/batch')
 const Iterator = require('./lib/iterator')
-
-const empty = b4a.alloc(0)
 
 const RocksDB = module.exports = class RocksDB extends ReadyResource {
   constructor (path, {
@@ -104,48 +101,16 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     }
   }
 
-  async deleteRange (start, end, opts = {}) {
-    if (typeof start === 'string') start = b4a.from(start)
-    if (typeof end === 'string') end = b4a.from(end)
-
-    if (start && !b4a.isBuffer(start)) {
-      opts = start
-      start = empty
-    } else if (end && !b4a.isBuffer(end)) {
-      opts = end
-      end = empty
-    }
-
-    const {
-      gt = empty,
-      gte = start,
-      lt = end,
-      lte = empty
-    } = opts
-
-    const req = { resolve: null, reject: null, handle: null }
-
-    const promise = new Promise((resolve, reject) => {
-      req.resolve = resolve
-      req.reject = reject
-    })
-
-    req.handle = binding.deleteRange(this._handle, gt, gte, lt, lte, req, onstatus)
-
-    return promise
-
-    function onstatus (err) {
-      if (err) req.reject(new Error(err))
-      else req.resolve()
-    }
-  }
-
-  batch (opts) {
-    return new Batch(this, opts)
-  }
-
   iterator (opts) {
     return new Iterator(this, opts)
+  }
+
+  read (opts) {
+    return new ReadBatch(this, opts)
+  }
+
+  write (opts) {
+    return new WriteBatch(this, opts)
   }
 
   static _instances = new Set()

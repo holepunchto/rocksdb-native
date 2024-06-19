@@ -14,16 +14,16 @@ test('write + read', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.batch()
-
   {
-    const p = batch.add('hello', 'world')
-    await batch.write()
-    t.alike(await p, b4a.from('world'))
+    const batch = db.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    await t.execution(p)
   }
   {
-    const p = batch.add('hello')
-    await batch.read()
+    const batch = db.read()
+    const p = batch.get('hello')
+    await batch.flush()
     t.alike(await p, b4a.from('world'))
   }
 
@@ -34,27 +34,27 @@ test('write + read multiple', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.batch()
-
   {
+    const batch = db.write()
     const p = []
 
     for (let i = 0; i < 100; i++) {
-      p.push(batch.add(`${i}`, `${i}`))
+      p.push(batch.put(`${i}`, `${i}`))
     }
 
-    await batch.write()
+    await batch.flush()
 
-    t.alike(await Promise.all(p), new Array(100).fill(0).map((_, i) => b4a.from(`${i}`)))
+    await t.execution(await Promise.all(p))
   }
   {
+    const batch = db.read()
     const p = []
 
     for (let i = 0; i < 100; i++) {
-      p.push(batch.add(`${i}`))
+      p.push(batch.get(`${i}`))
     }
 
-    await batch.read()
+    await batch.flush()
 
     t.alike(await Promise.all(p), new Array(100).fill(0).map((_, i) => b4a.from(`${i}`)))
   }
@@ -66,10 +66,9 @@ test('read missing', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.batch()
-
-  const p = batch.add('hello')
-  await batch.read()
+  const batch = db.read()
+  const p = batch.get('hello')
+  await batch.flush()
   t.alike(await p, null)
 
   await db.close()
@@ -80,33 +79,30 @@ test('delete range', async (t) => {
   await db.ready()
 
   {
-    const batch = db.batch()
-
-    batch.add('aa', 'aa')
-    batch.add('ab', 'ab')
-    batch.add('ba', 'ba')
-    batch.add('bb', 'bb')
-    batch.add('bc', 'bc')
-    batch.add('ac', 'ac')
-
-    await batch.write()
+    const batch = db.write()
+    batch.put('aa', 'aa')
+    batch.put('ab', 'ab')
+    batch.put('ba', 'ba')
+    batch.put('bb', 'bb')
+    batch.put('bc', 'bc')
+    batch.put('ac', 'ac')
+    await batch.flush()
   }
-
-  await db.deleteRange('a', 'b')
-
   {
-    const batch = db.batch()
-
+    const batch = db.write()
+    batch.deleteRange('a', 'b')
+    await batch.flush()
+  }
+  {
+    const batch = db.read()
     const p = []
-
-    p.push(batch.add('aa'))
-    p.push(batch.add('ab'))
-    p.push(batch.add('ac'))
-    p.push(batch.add('ba'))
-    p.push(batch.add('bb'))
-    p.push(batch.add('bc'))
-
-    await batch.read()
+    p.push(batch.get('aa'))
+    p.push(batch.get('ab'))
+    p.push(batch.get('ac'))
+    p.push(batch.get('ba'))
+    p.push(batch.get('bb'))
+    p.push(batch.get('bc'))
+    await batch.flush()
 
     t.alike(await Promise.all(p), [
       null,
@@ -125,14 +121,13 @@ test('prefix iterator', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.batch()
-
-  batch.add('aa', 'aa')
-  batch.add('ab', 'ab')
-  batch.add('ba', 'ba')
-  batch.add('bb', 'bb')
-  batch.add('ac', 'ac')
-  await batch.write()
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ba', 'ba')
+  batch.put('bb', 'bb')
+  batch.put('ac', 'ac')
+  await batch.flush()
 
   const entries = []
 
@@ -153,14 +148,13 @@ test('prefix iterator, reverse', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.batch()
-
-  batch.add('aa', 'aa')
-  batch.add('ab', 'ab')
-  batch.add('ba', 'ba')
-  batch.add('bb', 'bb')
-  batch.add('ac', 'ac')
-  await batch.write()
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ba', 'ba')
+  batch.put('bb', 'bb')
+  batch.put('ac', 'ac')
+  await batch.flush()
 
   const entries = []
 
@@ -181,14 +175,13 @@ test('prefix iterator, reverse with limit', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.batch()
-
-  batch.add('aa', 'aa')
-  batch.add('ab', 'ab')
-  batch.add('ba', 'ba')
-  batch.add('bb', 'bb')
-  batch.add('ac', 'ac')
-  await batch.write()
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ba', 'ba')
+  batch.put('bb', 'bb')
+  batch.put('ac', 'ac')
+  await batch.flush()
 
   const entries = []
 
@@ -207,12 +200,11 @@ test('iterator with encoding', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.batch({ encoding: c.string })
-
-  batch.add('a', 'hello')
-  batch.add('b', 'world')
-  batch.add('c', '!')
-  await batch.write()
+  const batch = db.write({ encoding: c.string })
+  batch.put('a', 'hello')
+  batch.put('b', 'world')
+  batch.put('c', '!')
+  await batch.flush()
 
   const entries = []
 
@@ -224,6 +216,37 @@ test('iterator with encoding', async (t) => {
     { key: 'a', value: 'hello' },
     { key: 'b', value: 'world' }
   ])
+
+  await db.close()
+})
+
+test('delete', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  {
+    const batch = db.write()
+    batch.put('hello', 'world')
+    batch.put('next', 'value')
+    batch.put('another', 'entry')
+    await batch.flush()
+  }
+  {
+    const batch = db.write()
+    batch.delete('hello')
+    batch.delete('next')
+    batch.delete('another')
+    await batch.flush()
+  }
+  {
+    const batch = db.read()
+    const p = []
+    p.push(batch.get('hello'))
+    p.push(batch.get('next'))
+    p.push(batch.get('another'))
+    await batch.flush()
+    t.alike(await Promise.all(p), [null, null, null])
+  }
 
   await db.close()
 })
