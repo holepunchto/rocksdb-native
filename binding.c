@@ -995,13 +995,13 @@ static js_value_t *
 rocksdb_native_batch_delete (js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 4;
-  js_value_t *argv[4];
+  size_t argc = 3;
+  js_value_t *argv[3];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 4);
+  assert(argc == 3);
 
   rocksdb_native_batch_t *batch;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &batch, NULL);
@@ -1013,16 +1013,13 @@ rocksdb_native_batch_delete (js_env_t *env, js_callback_info_t *info) {
   err = js_get_array_length(env, argv[1], &len);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[3], 1, &batch->on_status);
+  err = js_create_reference(env, argv[2], 1, &batch->on_status);
   assert(err == 0);
 
   err = rocksdb_native__get_slices(env, argv[1], len, batch->keys);
   assert(err == 0);
 
-  err = rocksdb_native__get_slices(env, argv[2], len, batch->values);
-  assert(err == 0);
-
-  err = rocksdb_batch_delete(&batch->handle, batch->keys, batch->values, len, rocksdb_native__on_batch_delete);
+  err = rocksdb_batch_delete(&batch->handle, batch->keys, len, rocksdb_native__on_batch_delete);
   assert(err == 0);
 
   return handle;
