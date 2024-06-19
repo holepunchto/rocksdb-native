@@ -18,8 +18,8 @@ w.put('hello', 'world')
 await w.flush()
 
 const r = db.read()
-const p = b.get('hello')
-b.flush()
+const p = r.get('hello')
+r.flush()
 
 console.log(await p)
 ```
