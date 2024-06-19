@@ -144,8 +144,8 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     return new Batch(this, opts)
   }
 
-  iterator (start, end, opts) {
-    return new Iterator(this, start, end, opts)
+  iterator (opts) {
+    return new Iterator(this, opts)
   }
 
   static _instances = new Set()
