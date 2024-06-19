@@ -1,5 +1,6 @@
 const test = require('brittle')
 const tmp = require('test-tmp')
+const c = require('compact-encoding')
 const b4a = require('b4a')
 const RocksDB = require('.')
 
@@ -135,7 +136,7 @@ test('prefix iterator', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator('a', 'b')) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b' })) {
     entries.push(entry)
   }
 
@@ -163,7 +164,7 @@ test('prefix iterator, reverse', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator('a', 'b', { reverse: true })) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b', reverse: true })) {
     entries.push(entry)
   }
 
@@ -191,12 +192,37 @@ test('prefix iterator, reverse with limit', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator('a', 'b', { reverse: true, limit: 1 })) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b', reverse: true, limit: 1 })) {
     entries.push(entry)
   }
 
   t.alike(entries, [
     { key: b4a.from('ac'), value: b4a.from('ac') }
+  ])
+
+  await db.close()
+})
+
+test('iterator with encoding', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.batch({ encoding: c.string })
+
+  batch.add('a', 'hello')
+  batch.add('b', 'world')
+  batch.add('c', '!')
+  await batch.write()
+
+  const entries = []
+
+  for await (const entry of db.iterator({ gte: 'a', lt: 'c', encoding: c.string })) {
+    entries.push(entry)
+  }
+
+  t.alike(entries, [
+    { key: 'a', value: 'hello' },
+    { key: 'b', value: 'world' }
   ])
 
   await db.close()
