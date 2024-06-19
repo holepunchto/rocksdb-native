@@ -611,10 +611,6 @@ rocksdb_native_read_init (js_env_t *env, js_callback_info_t *info) {
 
   assert(argc == 1);
 
-  rocksdb_native_t *db;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
-  assert(err == 0);
-
   js_value_t *handle;
 
   rocksdb_native_read_batch_t *batch;
@@ -802,10 +798,6 @@ rocksdb_native_write_init (js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
 
   assert(argc == 1);
-
-  rocksdb_native_t *db;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
-  assert(err == 0);
 
   js_value_t *handle;
 
