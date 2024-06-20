@@ -146,7 +146,7 @@ rocksdb_native__on_open (rocksdb_open_t *handle, int status) {
     assert(err == 0);
   }
 
-  js_call_function(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
+  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -241,7 +241,7 @@ rocksdb_native__on_close (rocksdb_close_t *handle, int status) {
   err = js_get_reference_value(env, req->on_close, &cb);
   assert(err == 0);
 
-  js_call_function(env, ctx, cb, 0, NULL, NULL);
+  js_call_function_with_checkpoint(env, ctx, cb, 0, NULL, NULL);
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -395,7 +395,7 @@ rocksdb_native__on_iterator_open (rocksdb_iterator_t *handle, int status) {
     assert(err == 0);
   }
 
-  js_call_function(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
+  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -477,7 +477,7 @@ rocksdb_native__on_iterator_close (rocksdb_iterator_t *handle, int status) {
     assert(err == 0);
   }
 
-  js_call_function(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
+  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -567,7 +567,7 @@ rocksdb_native__on_iterator_read (rocksdb_iterator_t *handle, int status) {
     }
   }
 
-  js_call_function(env, ctx, cb, 3, (js_value_t *[]){error, keys, values}, NULL);
+  js_call_function_with_checkpoint(env, ctx, cb, 3, (js_value_t *[]){error, keys, values}, NULL);
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -719,7 +719,7 @@ rocksdb_native__on_read (rocksdb_read_batch_t *handle, int status) {
   err = js_get_reference_value(env, batch->on_status, &cb);
   assert(err == 0);
 
-  js_call_function(env, ctx, cb, 2, (js_value_t *[]){errors, values}, NULL);
+  js_call_function_with_checkpoint(env, ctx, cb, 2, (js_value_t *[]){errors, values}, NULL);
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -885,7 +885,7 @@ rocksdb_native__on_write (rocksdb_write_batch_t *handle, int status) {
   err = js_get_reference_value(env, batch->on_status, &cb);
   assert(err == 0);
 
-  js_call_function(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
+  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
