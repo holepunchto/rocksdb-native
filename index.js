@@ -121,6 +121,31 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     return new WriteBatch(this, opts)
   }
 
+  async get (key, opts) {
+    const batch = this.read(opts)
+    const value = batch.get(key)
+    await batch.flush()
+    return value
+  }
+
+  async put (key, value, opts) {
+    const batch = this.write(opts)
+    batch.put(key, value)
+    await batch.flush()
+  }
+
+  async delete (key, opts) {
+    const batch = this.write(opts)
+    batch.delete(key)
+    await batch.flush()
+  }
+
+  async deleteRange (start, end, opts) {
+    const batch = this.write(opts)
+    batch.deleteRange(start, end)
+    await batch.flush()
+  }
+
   static _instances = new Set()
 }
 
