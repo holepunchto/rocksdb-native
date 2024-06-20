@@ -105,6 +105,14 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     return new Iterator(this, opts)
   }
 
+  async peek (opts) {
+    for await (const value of this.iterator({ ...opts, limit: 1 })) { // eslint-disable-line no-unreachable-loop
+      return value
+    }
+
+    return null
+  }
+
   read (opts) {
     return new ReadBatch(this, opts)
   }

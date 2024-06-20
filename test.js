@@ -254,6 +254,42 @@ test('iterator with encoding', async (t) => {
   await db.close()
 })
 
+test('peek', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ac', 'ac')
+  await batch.flush()
+
+  t.alike(await db.peek({ gte: 'a', lt: 'b' }), {
+    key: b4a.from('aa'),
+    value: b4a.from('aa')
+  })
+
+  await db.close()
+})
+
+test('peek, reverse', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ac', 'ac')
+  await batch.flush()
+
+  t.alike(await db.peek({ gte: 'a', lt: 'b', reverse: true }), {
+    key: b4a.from('ac'),
+    value: b4a.from('ac')
+  })
+
+  await db.close()
+})
+
 test('delete', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
