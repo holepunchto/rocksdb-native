@@ -5,5 +5,4 @@ sandbox.js
 node_modules
 coverage
 package-lock.json
-build
 example.db

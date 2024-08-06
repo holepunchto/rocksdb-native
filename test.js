@@ -74,6 +74,35 @@ test('read missing', async (t) => {
   await db.close()
 })
 
+test('read with snapshot', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  {
+    const batch = db.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    await t.execution(p)
+  }
+
+  const snapshot = db.snapshot()
+
+  {
+    const batch = db.write()
+    const p = batch.put('hello', 'earth')
+    await batch.flush()
+    await t.execution(p)
+  }
+  {
+    const batch = db.read({ snapshot })
+    const p = batch.get('hello')
+    await batch.flush()
+    t.alike(await p, b4a.from('world'))
+  }
+
+  await db.close()
+})
+
 test('delete range', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
@@ -249,6 +278,40 @@ test('iterator with encoding', async (t) => {
   t.alike(entries, [
     { key: 'a', value: 'hello' },
     { key: 'b', value: 'world' }
+  ])
+
+  await db.close()
+})
+
+test('iterator with snapshot', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ac', 'ac')
+  await batch.flush()
+
+  const snapshot = db.snapshot()
+
+  batch.put('aa', 'ba')
+  batch.put('ab', 'bb')
+  batch.put('ac', 'bc')
+  await batch.flush()
+
+  const entries = []
+
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b', snapshot })) {
+    entries.push(entry)
+  }
+
+  snapshot.destroy()
+
+  t.alike(entries, [
+    { key: b4a.from('aa'), value: b4a.from('aa') },
+    { key: b4a.from('ab'), value: b4a.from('ab') },
+    { key: b4a.from('ac'), value: b4a.from('ac') }
   ])
 
   await db.close()
