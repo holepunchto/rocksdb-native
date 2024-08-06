@@ -3,6 +3,7 @@ const ReadyResource = require('ready-resource')
 const binding = require('./binding')
 const { ReadBatch, WriteBatch } = require('./lib/batch')
 const Iterator = require('./lib/iterator')
+const Snapshot = require('./lib/snapshot')
 
 const RocksDB = module.exports = class RocksDB extends ReadyResource {
   constructor (path, {
@@ -38,6 +39,8 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     this.tableBlockSize = tableBlockSize
     this.tableCacheIndexAndFilterBlocks = tableCacheIndexAndFilterBlocks
     this.tableFormatVersion = tableFormatVersion
+
+    this._snapshots = new Set()
 
     this._handle = binding.init()
   }
@@ -82,6 +85,8 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   }
 
   async _close () {
+    for (const snapshot of this._snapshots) snapshot.destroy()
+
     const req = { resolve: null, reject: null, handle: null }
 
     const promise = new Promise((resolve, reject) => {
@@ -99,6 +104,10 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
       if (err) req.reject(new Error(err))
       else req.resolve()
     }
+  }
+
+  snapshot (opts) {
+    return new Snapshot(this, opts)
   }
 
   iterator (opts) {
