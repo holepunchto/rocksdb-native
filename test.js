@@ -221,7 +221,7 @@ test('prefix iterator, reverse', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'b', reverse: true })) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { reverse: true })) {
     entries.push(entry)
   }
 
@@ -248,7 +248,7 @@ test('prefix iterator, reverse with limit', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'b', reverse: true, limit: 1 })) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { reverse: true, limit: 1 })) {
     entries.push(entry)
   }
 
@@ -271,7 +271,7 @@ test('iterator with encoding', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'c', encoding: c.string })) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'c' }, { encoding: c.string })) {
     entries.push(entry)
   }
 
@@ -302,7 +302,7 @@ test('iterator with snapshot', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'b', snapshot })) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { snapshot })) {
     entries.push(entry)
   }
 
@@ -345,7 +345,7 @@ test('peek, reverse', async (t) => {
   batch.put('ac', 'ac')
   await batch.flush()
 
-  t.alike(await db.peek({ gte: 'a', lt: 'b', reverse: true }), {
+  t.alike(await db.peek({ gte: 'a', lt: 'b' }, { reverse: true }), {
     key: b4a.from('ac'),
     value: b4a.from('ac')
   })
