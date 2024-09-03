@@ -343,6 +343,16 @@ test('iterator with snapshot before db open', async (t) => {
   await db.close()
 })
 
+test('destroy snapshot before db open', async (t) => {
+  const db = new RocksDB(await tmp(t))
+
+  const snapshot = db.snapshot()
+  snapshot.destroy()
+
+  await db.ready()
+  await db.close()
+})
+
 test('peek', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
