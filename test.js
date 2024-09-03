@@ -317,6 +317,42 @@ test('iterator with snapshot', async (t) => {
   await db.close()
 })
 
+test('iterator with snapshot before db open', async (t) => {
+  const db = new RocksDB(await tmp(t))
+
+  const snapshot = db.snapshot()
+
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', 'ba')
+  batch.put('ab', 'bb')
+  batch.put('ac', 'bc')
+  await batch.flush()
+
+  const entries = []
+
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { snapshot })) {
+    entries.push(entry)
+  }
+
+  snapshot.destroy()
+
+  t.alike(entries, [])
+
+  await db.close()
+})
+
+test('destroy snapshot before db open', async (t) => {
+  const db = new RocksDB(await tmp(t))
+
+  const snapshot = db.snapshot()
+  snapshot.destroy()
+
+  await db.ready()
+  await db.close()
+})
+
 test('peek', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
