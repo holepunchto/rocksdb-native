@@ -76,7 +76,9 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
 
     RocksDB._instances.add(this)
 
-    return promise
+    await promise
+
+    for (const snapshot of this._snapshots) snapshot._init()
 
     function onopen (err) {
       if (err) req.reject(new Error(err))
@@ -98,7 +100,7 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
 
     RocksDB._instances.delete(this)
 
-    return promise
+    await promise
 
     function onclose (err) {
       if (err) req.reject(new Error(err))
