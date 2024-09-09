@@ -773,10 +773,10 @@ rocksdb_native_read (js_env_t *env, js_callback_info_t *info) {
   err = js_get_array_length(env, argv[2], &len);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[4], 0, &batch->ctx);
+  err = js_create_reference(env, argv[4], 1, &batch->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[5], 0, &batch->on_status);
+  err = js_create_reference(env, argv[5], 1, &batch->on_status);
   assert(err == 0);
 
   for (uint32_t i = 0; i < len; i++) {
