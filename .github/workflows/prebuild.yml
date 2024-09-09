@@ -32,7 +32,7 @@ jobs:
         node-version: lts/*
     - run: npm install -g bare-runtime bare-dev
     - run: npm install
-    - run: bare-dev install --bare --node --no-recursive --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+    - run: bare-dev install --bare --node --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
     - uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.platform }}-${{ matrix.arch }}
