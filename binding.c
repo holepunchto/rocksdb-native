@@ -737,15 +737,15 @@ rocksdb_native__on_read (rocksdb_read_batch_t *handle, int status) {
   err = js_get_reference_value(env, batch->on_status, &cb);
   assert(err == 0);
 
-  js_call_function_with_checkpoint(env, ctx, cb, 2, (js_value_t *[]){errors, values}, NULL);
-
-  err = js_close_handle_scope(env, scope);
-  assert(err == 0);
-
   err = js_delete_reference(env, batch->on_status);
   assert(err == 0);
 
   err = js_delete_reference(env, batch->ctx);
+  assert(err == 0);
+
+  js_call_function_with_checkpoint(env, ctx, cb, 2, (js_value_t *[]){errors, values}, NULL);
+
+  err = js_close_handle_scope(env, scope);
   assert(err == 0);
 }
 
@@ -914,15 +914,15 @@ rocksdb_native__on_write (rocksdb_write_batch_t *handle, int status) {
   err = js_get_reference_value(env, batch->on_status, &cb);
   assert(err == 0);
 
-  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
-
-  err = js_close_handle_scope(env, scope);
-  assert(err == 0);
-
   err = js_delete_reference(env, batch->on_status);
   assert(err == 0);
 
   err = js_delete_reference(env, batch->ctx);
+  assert(err == 0);
+
+  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]){error}, NULL);
+
+  err = js_close_handle_scope(env, scope);
   assert(err == 0);
 }
 
