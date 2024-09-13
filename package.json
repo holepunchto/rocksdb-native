@@ -37,7 +37,8 @@
     "compact-encoding": "^2.15.0",
     "load-addon": "^1.0.0",
     "ready-resource": "^1.0.0",
-    "streamx": "^2.16.1"
+    "streamx": "^2.16.1",
+    "which-runtime": "^1.2.1"
   },
   "devDependencies": {
     "brittle": "^3.5.0",

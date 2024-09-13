@@ -1,5 +1,6 @@
 /* global Bare */
 const ReadyResource = require('ready-resource')
+const { isBare, isNode } = require('which-runtime')
 const binding = require('./binding')
 const { ReadBatch, WriteBatch } = require('./lib/batch')
 const Iterator = require('./lib/iterator')
@@ -160,10 +161,23 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   static _instances = new Set()
 }
 
-if (typeof Bare !== 'undefined') {
-  Bare.on('exit', async () => {
-    for (const db of RocksDB._instances) {
-      await db.close()
-    }
+async function closeDBs () {
+  for (const db of RocksDB._instances) {
+    await db.close()
+  }
+}
+
+function nodeAsyncExit (fn) {
+  ['beforeExit', 'SIGINT', 'SIGTERM', 'SIGHUP', 'SIGBREAK'].forEach(event => {
+    process.once(event, async (code = 0) => {
+      await fn()
+      process.exit(code)
+    })
   })
+}
+
+if (isBare) {
+  Bare.on('exit', closeDBs)
+} else if (isNode) {
+  nodeAsyncExit(closeDBs)
 }
