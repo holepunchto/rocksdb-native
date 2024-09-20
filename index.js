@@ -41,7 +41,7 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     this.tableFormatVersion = tableFormatVersion
 
     this._snapshots = new Set()
-    this._pendingOps = 0
+    this._refs = 0
     this._resolvePreclose = null
 
     this._handle = binding.init()
@@ -89,7 +89,7 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   }
 
   async _close () {
-    if (this._pendingOps > 0) {
+    if (this._refs > 0) {
       await new Promise((resolve) => {
         this._resolvePreclose = resolve
       })
@@ -116,8 +116,12 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     }
   }
 
-  _onopfinished () {
-    if (--this._pendingOps === 0 && this._resolvePreclose !== null) {
+  _incRef () {
+    this._refs++
+  }
+
+  _decRef () {
+    if (--this._refs === 0 && this._resolvePreclose !== null) {
       const resolve = this._resolvePreclose
       this._resolvePreclose = null
       resolve()
@@ -129,7 +133,6 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   }
 
   iterator (range, opts) {
-    this._pendingOps++
     return new Iterator(this, { ...range, ...opts })
   }
 
@@ -142,12 +145,10 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   }
 
   read (opts) {
-    this._pendingOps++
     return new ReadBatch(this, opts)
   }
 
   write (opts) {
-    this._pendingOps++
     return new WriteBatch(this, opts)
   }
 
