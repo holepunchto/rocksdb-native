@@ -41,6 +41,8 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     this.tableFormatVersion = tableFormatVersion
 
     this._snapshots = new Set()
+    this._refs = 0
+    this._resolvePreclose = null
 
     this._handle = binding.init()
   }
@@ -87,6 +89,12 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   }
 
   async _close () {
+    if (this._refs > 0) {
+      await new Promise((resolve) => {
+        this._resolvePreclose = resolve
+      })
+    }
+
     for (const snapshot of this._snapshots) snapshot.destroy()
 
     const req = { resolve: null, reject: null, handle: null }
@@ -105,6 +113,18 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     function onclose (err) {
       if (err) req.reject(new Error(err))
       else req.resolve()
+    }
+  }
+
+  _incRef () {
+    this._refs++
+  }
+
+  _decRef () {
+    if (--this._refs === 0 && this._resolvePreclose !== null) {
+      const resolve = this._resolvePreclose
+      this._resolvePreclose = null
+      resolve()
     }
   }
 
