@@ -43,6 +43,8 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     this._snapshots = new Set()
     this._refs = 0
     this._resolvePreclose = null
+    this._resolveOnIdle = null
+    this._idlePromise = null
 
     this._handle = binding.init()
   }
@@ -121,11 +123,34 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   }
 
   _decRef () {
-    if (--this._refs === 0 && this._resolvePreclose !== null) {
+    if (--this._refs !== 0) return
+
+    if (this._resolveOnIdle !== null) {
+      const resolve = this._resolveOnIdle
+      this._resolveOnIdle = null
+      this._idlePromise = null
+      resolve()
+    }
+
+    if (this._resolvePreclose !== null) {
       const resolve = this._resolvePreclose
       this._resolvePreclose = null
       resolve()
     }
+  }
+
+  isIdle () {
+    return this._refs === 0
+  }
+
+  idle () {
+    if (this.isIdle()) return Promise.resolve()
+
+    if (!this._idlePromise) {
+      this._idlePromise = new Promise(resolve => { this._resolveOnIdle = resolve })
+    }
+
+    return this._idlePromise
   }
 
   snapshot (opts) {
