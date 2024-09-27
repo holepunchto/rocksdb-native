@@ -419,3 +419,60 @@ test('delete', async (t) => {
 
   await db.close()
 })
+
+test('idle', async function (t) {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  t.ok(db.isIdle())
+
+  {
+    const b = db.write()
+    b.put('hello', 'world')
+    b.put('next', 'value')
+    b.put('another', 'entry')
+
+    t.absent(db.isIdle())
+    const idle = db.idle()
+
+    await b.flush()
+
+    await t.execution(idle)
+    t.ok(db.isIdle())
+  }
+
+  {
+    let idle = false
+
+    const b1 = db.read()
+    const b2 = db.read()
+    const b3 = db.read()
+
+    const node1 = b1.get('hello')
+    const node2 = b2.get('next')
+    const node3 = b3.get('another')
+
+    const promise = db.idle().then(() => { idle = true })
+
+    b1.tryFlush()
+
+    t.absent(idle)
+    t.absent(db.isIdle())
+
+    b2.tryFlush()
+
+    t.absent(idle)
+    t.absent(db.isIdle())
+
+    b3.tryFlush()
+
+    await t.execution(promise)
+
+    t.ok(idle)
+    t.ok(db.isIdle())
+
+    t.alike(await node1, b4a.from('world'))
+    t.alike(await node2, b4a.from('value'))
+    t.alike(await node3, b4a.from('entry'))
+  }
+})
