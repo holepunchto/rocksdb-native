@@ -475,4 +475,6 @@ test('idle', async function (t) {
     t.alike(await node2, b4a.from('value'))
     t.alike(await node3, b4a.from('entry'))
   }
+
+  await db.close()
 })
