@@ -119,6 +119,10 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
   }
 
   _incRef () {
+    if (this.closing !== null) {
+      throw new Error('Database closed')
+    }
+
     this._refs++
   }
 
