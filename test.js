@@ -419,3 +419,13 @@ test('delete', async (t) => {
 
   await db.close()
 })
+
+test('write + read after close', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  await db.close()
+
+  t.exception(() => db.read())
+  t.exception(() => db.write())
+})
