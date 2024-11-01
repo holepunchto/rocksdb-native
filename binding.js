@@ -1,1 +1,1 @@
-module.exports = require('load-addon')(__dirname)
+module.exports = require('require-addon')('.', __filename)

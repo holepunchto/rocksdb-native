@@ -35,12 +35,15 @@
   "dependencies": {
     "b4a": "^1.6.6",
     "compact-encoding": "^2.15.0",
-    "load-addon": "^1.0.0",
     "ready-resource": "^1.0.0",
+    "require-addon": "^1.0.2",
     "streamx": "^2.16.1"
   },
   "devDependencies": {
+    "bare-compat-napi": "^1.0.0",
     "brittle": "^3.5.0",
+    "cmake-bare": "^1.1.14",
+    "cmake-napi": "^1.0.6",
     "standard": "^17.1.0",
     "test-tmp": "^1.2.0"
   }

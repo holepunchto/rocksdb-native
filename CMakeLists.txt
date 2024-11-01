@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(rocksdb_native C CXX)
+find_package(cmake-bare REQUIRED PATHS node_modules/cmake-bare)
+find_package(cmake-napi REQUIRED PATHS node_modules/cmake-napi)
+find_package(cmake-npm REQUIRED PATHS node_modules/cmake-npm)
 
-include(bare)
-include(napi)
+project(rocksdb_native C CXX)
 
 add_subdirectory(vendor/librocksdb EXCLUDE_FROM_ALL)
 
@@ -18,27 +19,29 @@ target_sources(
 target_link_libraries(
   ${rocksdb_native_bare}
   PUBLIC
-    rocksdb_static
+    rocksdb
+    rocksdb_facebook
 )
 
-add_napi_module(rocksdb_native_node)
-
-bare_include_directories(compat NAPI)
-
-target_include_directories(
-  ${rocksdb_native_node}
-  PRIVATE
-    ${compat}
-)
+add_napi_module(rocksdb_native_napi)
 
 target_sources(
-  ${rocksdb_native_node}
+  ${rocksdb_native_napi}
   PRIVATE
     binding.c
 )
 
 target_link_libraries(
-  ${rocksdb_native_node}
+  ${rocksdb_native_napi}
   PUBLIC
-    rocksdb_static
+    rocksdb
+    rocksdb_facebook
+)
+
+resolve_node_module(bare-compat-napi compat)
+
+target_include_directories(
+  ${rocksdb_native_napi}
+  PRIVATE
+    "${compat}/include"
 )
