@@ -7,7 +7,7 @@ find_package(cmake-npm REQUIRED PATHS node_modules/cmake-npm)
 
 project(rocksdb_native C CXX)
 
-fetch_package("github:holepunchto/librocksdb#f6b74e6")
+fetch_package("github:holepunchto/librocksdb#0934354")
 
 add_bare_module(rocksdb_native_bare)
 
