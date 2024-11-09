@@ -19,9 +19,13 @@ target_sources(
 
 target_link_libraries(
   ${rocksdb_native_bare}
+  PRIVATE
+    $<TARGET_OBJECTS:rocksdb>
+    $<TARGET_OBJECTS:path>
   PUBLIC
     rocksdb
     rocksdb_facebook
+    path
 )
 
 add_napi_module(rocksdb_native_napi)
@@ -34,9 +38,13 @@ target_sources(
 
 target_link_libraries(
   ${rocksdb_native_napi}
+  PRIVATE
+    $<TARGET_OBJECTS:rocksdb>
+    $<TARGET_OBJECTS:path>
   PUBLIC
     rocksdb
     rocksdb_facebook
+    path
 )
 
 resolve_node_module(bare-compat-napi compat)
