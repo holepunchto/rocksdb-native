@@ -1,4 +1,0 @@
-[submodule "vendor/librocksdb"]
-	path = vendor/librocksdb
-	url = ../../holepunchto/librocksdb.git
-	shallow = true

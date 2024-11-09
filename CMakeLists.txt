@@ -1,12 +1,13 @@
 cmake_minimum_required(VERSION 3.25)
 
 find_package(cmake-bare REQUIRED PATHS node_modules/cmake-bare)
+find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
 find_package(cmake-napi REQUIRED PATHS node_modules/cmake-napi)
 find_package(cmake-npm REQUIRED PATHS node_modules/cmake-npm)
 
 project(rocksdb_native C CXX)
 
-add_subdirectory(vendor/librocksdb EXCLUDE_FROM_ALL)
+fetch_package("github:holepunchto/librocksdb#f6b74e6")
 
 add_bare_module(rocksdb_native_bare)
 
