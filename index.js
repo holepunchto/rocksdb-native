@@ -5,23 +5,26 @@ const { ReadBatch, WriteBatch } = require('./lib/batch')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
 
-const RocksDB = module.exports = class RocksDB extends ReadyResource {
-  constructor (path, {
-    // default options, https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning
-    readOnly = false,
-    createIfMissing = true,
-    maxBackgroundJobs = 6,
-    bytesPerSync = 1048576,
-    // blob options, https://github.com/facebook/rocksdb/wiki/BlobDB
-    enableBlobFiles = false,
-    minBlobSize = 0,
-    blobFileSize = 0,
-    enableBlobGarbageCollection = true,
-    // (block) table options
-    tableBlockSize = 16384,
-    tableCacheIndexAndFilterBlocks = true,
-    tableFormatVersion = 4
-  } = {}) {
+module.exports = class RocksDB extends ReadyResource {
+  constructor(
+    path,
+    {
+      // default options, https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning
+      readOnly = false,
+      createIfMissing = true,
+      maxBackgroundJobs = 6,
+      bytesPerSync = 1048576,
+      // blob options, https://github.com/facebook/rocksdb/wiki/BlobDB
+      enableBlobFiles = false,
+      minBlobSize = 0,
+      blobFileSize = 0,
+      enableBlobGarbageCollection = true,
+      // (block) table options
+      tableBlockSize = 16384,
+      tableCacheIndexAndFilterBlocks = true,
+      tableFormatVersion = 4
+    } = {}
+  ) {
     super()
 
     this.path = path
@@ -49,7 +52,7 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     this._handle = binding.init()
   }
 
-  async _open () {
+  async _open() {
     const opts = new Uint32Array(16)
 
     opts[0] = this.readOnly ? 1 : 0
@@ -84,13 +87,13 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
 
     for (const snapshot of this._snapshots) snapshot._init()
 
-    function onopen (err) {
+    function onopen(err) {
       if (err) req.reject(new Error(err))
       else req.resolve()
     }
   }
 
-  async _close () {
+  async _close() {
     if (this._refs > 0) {
       await new Promise((resolve) => {
         this._resolvePreclose = resolve
@@ -112,13 +115,13 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
 
     await promise
 
-    function onclose (err) {
+    function onclose(err) {
       if (err) req.reject(new Error(err))
       else req.resolve()
     }
   }
 
-  _incRef () {
+  _incRef() {
     if (this.closing !== null) {
       throw new Error('Database closed')
     }
@@ -126,7 +129,7 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     this._refs++
   }
 
-  _decRef () {
+  _decRef() {
     if (--this._refs !== 0) return
 
     if (this._resolveOnIdle !== null) {
@@ -143,64 +146,67 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
     }
   }
 
-  isIdle () {
+  isIdle() {
     return this._refs === 0
   }
 
-  idle () {
+  idle() {
     if (this.isIdle()) return Promise.resolve()
 
     if (!this._idlePromise) {
-      this._idlePromise = new Promise(resolve => { this._resolveOnIdle = resolve })
+      this._idlePromise = new Promise((resolve) => {
+        this._resolveOnIdle = resolve
+      })
     }
 
     return this._idlePromise
   }
 
-  snapshot (opts) {
+  snapshot(opts) {
     return new Snapshot(this, opts)
   }
 
-  iterator (range, opts) {
+  iterator(range, opts) {
     return new Iterator(this, { ...range, ...opts })
   }
 
-  async peek (range, opts) {
-    for await (const value of this.iterator({ ...range, ...opts, limit: 1 })) { // eslint-disable-line no-unreachable-loop
+  async peek(range, opts) {
+    for await (const value of this.iterator({ ...range, ...opts, limit: 1 })) {
+      // eslint-disable-line no-unreachable-loop
       return value
     }
 
     return null
   }
 
-  read (opts) {
+  read(opts) {
     return new ReadBatch(this, opts)
   }
 
-  write (opts) {
+  write(opts) {
     return new WriteBatch(this, opts)
   }
 
-  async get (key, opts) {
+  async get(key, opts) {
     const batch = this.read(opts)
     const value = batch.get(key)
     await batch.flush()
     return value
   }
 
-  async put (key, value, opts) {
+  async put(key, value, opts) {
     const batch = this.write(opts)
     batch.put(key, value)
     await batch.flush()
   }
 
-  async delete (key, opts) {
+  async delete(key, opts) {
     const batch = this.write(opts)
     batch.delete(key)
     await batch.flush()
   }
 
-  async deleteRange (start, end, opts) {
+  async deleteRange(start, end, opts) {
     const batch = this.write(opts)
     batch.deleteRange(start, end)
     await batch.flush()
@@ -211,7 +217,7 @@ const RocksDB = module.exports = class RocksDB extends ReadyResource {
 
 if (typeof Bare !== 'undefined') {
   Bare.on('exit', async () => {
-    for (const db of RocksDB._instances) {
+    for (const db of exports._instances) {
       await db.close()
     }
   })

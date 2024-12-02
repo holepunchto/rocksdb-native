@@ -56,7 +56,10 @@ test('write + read multiple', async (t) => {
 
     await batch.flush()
 
-    t.alike(await Promise.all(p), new Array(100).fill(0).map((_, i) => b4a.from(`${i}`)))
+    t.alike(
+      await Promise.all(p),
+      new Array(100).fill(0).map((_, i) => b4a.from(`${i}`))
+    )
   }
 
   await db.close()
@@ -170,11 +173,7 @@ test('delete range, end does not exist', async (t) => {
     p.push(batch.get('ac'))
     await batch.flush()
 
-    t.alike(await Promise.all(p), [
-      null,
-      null,
-      null
-    ])
+    t.alike(await Promise.all(p), [null, null, null])
   }
 
   await db.close()
@@ -221,7 +220,10 @@ test('prefix iterator, reverse', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { reverse: true })) {
+  for await (const entry of db.iterator(
+    { gte: 'a', lt: 'b' },
+    { reverse: true }
+  )) {
     entries.push(entry)
   }
 
@@ -248,13 +250,14 @@ test('prefix iterator, reverse with limit', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { reverse: true, limit: 1 })) {
+  for await (const entry of db.iterator(
+    { gte: 'a', lt: 'b' },
+    { reverse: true, limit: 1 }
+  )) {
     entries.push(entry)
   }
 
-  t.alike(entries, [
-    { key: b4a.from('ac'), value: b4a.from('ac') }
-  ])
+  t.alike(entries, [{ key: b4a.from('ac'), value: b4a.from('ac') }])
 
   await db.close()
 })
@@ -271,7 +274,10 @@ test('iterator with encoding', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'c' }, { encoding: c.string })) {
+  for await (const entry of db.iterator(
+    { gte: 'a', lt: 'c' },
+    { encoding: c.string }
+  )) {
     entries.push(entry)
   }
 
@@ -452,7 +458,9 @@ test('idle', async function (t) {
     const node2 = b2.get('next')
     const node3 = b3.get('another')
 
-    const promise = db.idle().then(() => { idle = true })
+    const promise = db.idle().then(() => {
+      idle = true
+    })
 
     b1.tryFlush()
 

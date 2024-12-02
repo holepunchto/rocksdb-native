@@ -19,7 +19,7 @@
     "test": "npm run lint && npm run test:bare && npm run test:node",
     "test:bare": "bare test.js",
     "test:node": "node test.js",
-    "lint": "standard"
+    "lint": "prettier . --check"
   },
   "repository": {
     "type": "git",
@@ -44,7 +44,8 @@
     "cmake-bare": "^1.1.14",
     "cmake-fetch": "^1.0.1",
     "cmake-napi": "^1.0.6",
-    "standard": "^17.1.0",
+    "prettier": "^3.4.1",
+    "prettier-config-standard": "^7.0.0",
     "test-tmp": "^1.2.0"
   }
 }
