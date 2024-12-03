@@ -496,3 +496,41 @@ test('write + read after close', async (t) => {
   t.exception(() => db.read())
   t.exception(() => db.write())
 })
+
+test('write batch fork', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch1 = db.write()
+  const batch2 = batch1.fork()
+
+  batch1.put('hello', 'world')
+  batch1.put('goodbye', 'test')
+
+  batch2.put('hold', 'up')
+
+  const flushing = batch1.flush()
+
+  {
+    const read = db.read()
+    p = read.get('hello')
+    read.tryFlush()
+
+    t.is(await p, null)
+  }
+
+  await batch2.flush()
+  await t.execution(flushing)
+
+  {
+    const read = db.read()
+    const p1 = read.get('hello')
+    const p2 = read.get('goodbye')
+    const p3 = read.get('hold')
+    read.tryFlush()
+
+    t.alike(await p1, b4a.from('world'))
+    t.alike(await p2, b4a.from('test'))
+    t.alike(await p3, b4a.from('up'))
+  }
+})
