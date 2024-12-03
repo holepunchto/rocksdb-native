@@ -533,4 +533,6 @@ test('write batch fork', async (t) => {
     t.alike(await p2, b4a.from('test'))
     t.alike(await p3, b4a.from('up'))
   }
+
+  await db.close()
 })
