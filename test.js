@@ -293,18 +293,23 @@ test('iterator with snapshot', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.write()
-  batch.put('aa', 'aa')
-  batch.put('ab', 'ab')
-  batch.put('ac', 'ac')
-  await batch.flush()
+  {
+    const batch = db.write()
+    batch.put('aa', 'aa')
+    batch.put('ab', 'ab')
+    batch.put('ac', 'ac')
+    await batch.flush()
+  }
 
   const snapshot = db.snapshot()
 
-  batch.put('aa', 'ba')
-  batch.put('ab', 'bb')
-  batch.put('ac', 'bc')
-  await batch.flush()
+  {
+    const batch = db.write()
+    batch.put('aa', 'ba')
+    batch.put('ab', 'bb')
+    batch.put('ac', 'bc')
+    await batch.flush()
+  }
 
   const entries = []
 
@@ -495,4 +500,43 @@ test('write + read after close', async (t) => {
 
   t.exception(() => db.read())
   t.exception(() => db.write())
+})
+
+test('batch autoDestroy', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  {
+    const batch = db.write()
+    batch.put('aa', 'aa')
+    await batch.flush()
+
+    batch.put('aa', 'ba')
+    await t.exception(() => batch.flush())
+  }
+
+  {
+    const read = db.read()
+    const p = read.get('aa')
+    read.tryFlush()
+
+    t.alike(await p, b4a.from('aa'))
+  }
+
+  {
+    const batch = db.write({ autoDestroy: false })
+    batch.put('ab', 'ab')
+    await batch.flush()
+
+    batch.put('ab', 'bb')
+    await t.execution(() => batch.flush())
+  }
+
+  {
+    const read = db.read()
+    const p = read.get('ab')
+    read.tryFlush()
+
+    t.alike(await p, b4a.from('bb'))
+  }
 })
