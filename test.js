@@ -523,14 +523,20 @@ test('batch autoDestroy', async (t) => {
     t.alike(await p, b4a.from('aa'))
   }
 
-  {
-    const batch = db.write({ autoDestroy: false })
-    batch.put('ab', 'ab')
-    await batch.flush()
+  const batch = db.write({ autoDestroy: false })
+  batch.put('ab', 'ab')
+  await batch.flush()
 
-    batch.put('ab', 'bb')
-    await t.execution(() => batch.flush())
+  {
+    const read = db.read()
+    const p = read.get('ab')
+    read.tryFlush()
+
+    t.alike(await p, b4a.from('ab'))
   }
+
+  batch.put('ab', 'bb')
+  await t.execution(() => batch.flush())
 
   {
     const read = db.read()
@@ -540,5 +546,6 @@ test('batch autoDestroy', async (t) => {
     t.alike(await p, b4a.from('bb'))
   }
 
+  batch.destroy()
   await db.close()
 })
