@@ -539,4 +539,6 @@ test('batch autoDestroy', async (t) => {
 
     t.alike(await p, b4a.from('bb'))
   }
+
+  await db.close()
 })
