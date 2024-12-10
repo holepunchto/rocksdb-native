@@ -31,6 +31,9 @@
     "url": "https://github.com/holepunchto/rocksdb-native/issues"
   },
   "homepage": "https://github.com/holepunchto/rocksdb-native",
+  "engines": {
+    "bare": ">=1.7.0"
+  },
   "dependencies": {
     "b4a": "^1.6.6",
     "compact-encoding": "^2.15.0",
@@ -39,7 +42,7 @@
     "streamx": "^2.16.1"
   },
   "devDependencies": {
-    "bare-compat-napi": "^1.0.0",
+    "bare-compat-napi": "^1.1.0",
     "brittle": "^3.5.0",
     "cmake-bare": "^1.1.14",
     "cmake-fetch": "^1.0.1",

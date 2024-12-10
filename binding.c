@@ -27,6 +27,13 @@ typedef struct {
 
 typedef struct {
   rocksdb_t handle;
+
+  js_env_t *env;
+
+  bool closing;
+  bool exiting;
+
+  js_deferred_teardown_t *teardown;
 } rocksdb_native_t;
 
 typedef struct {
@@ -93,29 +100,47 @@ rocksdb_native__on_free(js_env_t *env, void *data, void *finalize_hint) {
   free(data);
 }
 
-static js_value_t *
-rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
+static void
+rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
   int err;
 
-  uv_loop_t *loop;
-  err = js_get_env_loop(env, &loop);
+  assert(status == 0);
+
+  rocksdb_native_close_t *req = (rocksdb_native_close_t *) handle->data;
+
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
+
+  js_deferred_teardown_t *teardown = db->teardown;
+
+  js_handle_scope_t *scope;
+  err = js_open_handle_scope(env, &scope);
   assert(err == 0);
 
-  js_value_t *handle;
-
-  rocksdb_native_t *db;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_t), (void **) &db, &handle);
+  js_value_t *ctx;
+  err = js_get_reference_value(env, req->ctx, &ctx);
   assert(err == 0);
 
-  err = rocksdb_init(loop, &db->handle);
+  js_value_t *cb;
+  err = js_get_reference_value(env, req->on_close, &cb);
   assert(err == 0);
 
-  return handle;
-}
+  err = js_delete_reference(env, req->on_close);
+  assert(err == 0);
 
-static inline uint64_t
-rocksdb_native__to_uint6(rocksdb_native_uint64_t n) {
-  return n.high * 0x100000000 + n.low;
+  err = js_delete_reference(env, req->ctx);
+  assert(err == 0);
+
+  if (!db->exiting) {
+    js_call_function_with_checkpoint(env, ctx, cb, 0, NULL, NULL);
+  }
+
+  err = js_close_handle_scope(env, scope);
+  assert(err == 0);
+
+  err = js_finish_deferred_teardown_callback(teardown);
+  assert(err == 0);
 }
 
 static void
@@ -125,6 +150,8 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
   assert(status == 0);
 
   rocksdb_native_open_t *req = (rocksdb_native_open_t *) handle->data;
+
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
 
   js_env_t *env = req->env;
 
@@ -140,6 +167,12 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
   err = js_get_reference_value(env, req->on_open, &cb);
   assert(err == 0);
 
+  err = js_delete_reference(env, req->on_open);
+  assert(err == 0);
+
+  err = js_delete_reference(env, req->ctx);
+  assert(err == 0);
+
   js_value_t *error;
 
   if (req->handle.error) {
@@ -150,16 +183,85 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
     assert(err == 0);
   }
 
-  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  if (!db->exiting) {
+    js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
+}
 
-  err = js_delete_reference(env, req->on_open);
+static void
+rocksdb_native__on_teardown(js_deferred_teardown_t *handle, void *data) {
+  int err;
+
+  rocksdb_native_t *db = (rocksdb_native_t *) data;
+
+  js_env_t *env = db->env;
+
+  db->exiting = true;
+
+  if (db->closing) return;
+
+  js_handle_scope_t *scope;
+  err = js_open_handle_scope(env, &scope);
   assert(err == 0);
 
-  err = js_delete_reference(env, req->ctx);
+  js_value_t *ctx;
+
+  rocksdb_native_close_t *req;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_close_t), (void **) &req, &ctx);
   assert(err == 0);
+
+  req->env = env;
+  req->handle.data = (void *) req;
+
+  err = js_create_reference(env, ctx, 1, &req->ctx);
+  assert(err == 0);
+
+  js_value_t *on_close;
+  err = js_get_null(env, &on_close);
+  assert(err == 0);
+
+  err = js_create_reference(env, on_close, 1, &req->on_close);
+  assert(err == 0);
+
+  db->closing = true;
+
+  err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_close);
+  assert(err == 0);
+
+  err = js_close_handle_scope(env, scope);
+  assert(err == 0);
+}
+
+static js_value_t *
+rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  uv_loop_t *loop;
+  err = js_get_env_loop(env, &loop);
+  assert(err == 0);
+
+  js_value_t *handle;
+
+  rocksdb_native_t *db;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_t), (void **) &db, &handle);
+  assert(err == 0);
+
+  db->env = env;
+  db->closing = false;
+  db->exiting = false;
+
+  err = rocksdb_init(loop, &db->handle);
+  assert(err == 0);
+
+  return handle;
+}
+
+static inline uint64_t
+rocksdb_native__to_uint64(rocksdb_native_uint64_t n) {
+  return n.high * 0x100000000 + n.low;
 }
 
 static js_value_t *
@@ -191,13 +293,13 @@ rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
     o->read_only,
     o->create_if_missing,
     o->max_background_jobs,
-    rocksdb_native__to_uint6(o->bytes_per_sync),
+    rocksdb_native__to_uint64(o->bytes_per_sync),
     o->compation_style,
     o->enable_blob_files,
-    rocksdb_native__to_uint6(o->min_blob_size),
-    rocksdb_native__to_uint6(o->blob_file_size),
+    rocksdb_native__to_uint64(o->min_blob_size),
+    rocksdb_native__to_uint64(o->blob_file_size),
     o->enable_blob_garbage_collection,
-    rocksdb_native__to_uint6(o->table_block_size),
+    rocksdb_native__to_uint64(o->table_block_size),
     o->table_cache_index_and_filter_blocks,
     o->table_format_version
   };
@@ -220,41 +322,10 @@ rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
   err = rocksdb_open(&db->handle, &req->handle, (const char *) path, &options, rocksdb_native__on_open);
   assert(err == 0);
 
+  err = js_add_deferred_teardown_callback(env, rocksdb_native__on_teardown, (void *) db, &db->teardown);
+  assert(err == 0);
+
   return handle;
-}
-
-static void
-rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
-  int err;
-
-  assert(status == 0);
-
-  rocksdb_native_close_t *req = (rocksdb_native_close_t *) handle->data;
-
-  js_env_t *env = req->env;
-
-  js_handle_scope_t *scope;
-  err = js_open_handle_scope(env, &scope);
-  assert(err == 0);
-
-  js_value_t *ctx;
-  err = js_get_reference_value(env, req->ctx, &ctx);
-  assert(err == 0);
-
-  js_value_t *cb;
-  err = js_get_reference_value(env, req->on_close, &cb);
-  assert(err == 0);
-
-  js_call_function_with_checkpoint(env, ctx, cb, 0, NULL, NULL);
-
-  err = js_close_handle_scope(env, scope);
-  assert(err == 0);
-
-  err = js_delete_reference(env, req->on_close);
-  assert(err == 0);
-
-  err = js_delete_reference(env, req->ctx);
-  assert(err == 0);
 }
 
 static js_value_t *
@@ -288,6 +359,8 @@ rocksdb_native_close(js_env_t *env, js_callback_info_t *info) {
   err = js_create_reference(env, argv[2], 1, &req->on_close);
   assert(err == 0);
 
+  db->closing = true;
+
   err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_close);
   assert(err == 0);
 
@@ -308,23 +381,23 @@ rocksdb_native_iterator_init(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t *handle;
 
-  rocksdb_native_iterator_t *iterator;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_iterator_t), (void **) &iterator, &handle);
+  rocksdb_native_iterator_t *req;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_iterator_t), (void **) &req, &handle);
   assert(err == 0);
 
-  iterator->env = env;
-  iterator->handle.data = (void *) iterator;
+  req->env = env;
+  req->handle.data = (void *) req;
 
-  err = js_create_reference(env, argv[0], 1, &iterator->ctx);
+  err = js_create_reference(env, argv[0], 1, &req->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[1], 1, &iterator->on_open);
+  err = js_create_reference(env, argv[1], 1, &req->on_open);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[2], 1, &iterator->on_close);
+  err = js_create_reference(env, argv[2], 1, &req->on_close);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[3], 1, &iterator->on_read);
+  err = js_create_reference(env, argv[3], 1, &req->on_read);
   assert(err == 0);
 
   return handle;
@@ -342,8 +415,8 @@ rocksdb_native_iterator_buffer(js_env_t *env, js_callback_info_t *info) {
 
   assert(argc == 2);
 
-  rocksdb_native_iterator_t *iterator;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &iterator, NULL);
+  rocksdb_native_iterator_t *req;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &req, NULL);
   assert(err == 0);
 
   uint32_t capacity;
@@ -358,11 +431,11 @@ rocksdb_native_iterator_buffer(js_env_t *env, js_callback_info_t *info) {
 
   size_t offset = 0;
 
-  iterator->keys = (rocksdb_slice_t *) &data[offset];
+  req->keys = (rocksdb_slice_t *) &data[offset];
 
   offset += capacity * sizeof(rocksdb_slice_t);
 
-  iterator->values = (rocksdb_slice_t *) &data[offset];
+  req->values = (rocksdb_slice_t *) &data[offset];
 
   return handle;
 }
@@ -373,33 +446,37 @@ rocksdb_native__on_iterator_open(rocksdb_iterator_t *handle, int status) {
 
   assert(status == 0);
 
-  rocksdb_native_iterator_t *iterator = (rocksdb_native_iterator_t *) handle->data;
+  rocksdb_native_iterator_t *req = (rocksdb_native_iterator_t *) handle->data;
 
-  js_env_t *env = iterator->env;
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
 
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
   assert(err == 0);
 
   js_value_t *ctx;
-  err = js_get_reference_value(env, iterator->ctx, &ctx);
+  err = js_get_reference_value(env, req->ctx, &ctx);
   assert(err == 0);
 
   js_value_t *cb;
-  err = js_get_reference_value(env, iterator->on_open, &cb);
+  err = js_get_reference_value(env, req->on_open, &cb);
   assert(err == 0);
 
   js_value_t *error;
 
-  if (iterator->handle.error) {
-    err = js_create_string_utf8(env, (utf8_t *) iterator->handle.error, -1, &error);
+  if (req->handle.error) {
+    err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
     assert(err == 0);
   } else {
     err = js_get_null(env, &error);
     assert(err == 0);
   }
 
-  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  if (!db->exiting) {
+    js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -421,8 +498,8 @@ rocksdb_native_iterator_open(js_env_t *env, js_callback_info_t *info) {
   err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
   assert(err == 0);
 
-  rocksdb_native_iterator_t *iterator;
-  err = js_get_arraybuffer_info(env, argv[1], (void **) &iterator, NULL);
+  rocksdb_native_iterator_t *req;
+  err = js_get_arraybuffer_info(env, argv[1], (void **) &req, NULL);
   assert(err == 0);
 
   rocksdb_range_t range;
@@ -456,7 +533,7 @@ rocksdb_native_iterator_open(js_env_t *env, js_callback_info_t *info) {
     assert(err == 0);
   }
 
-  err = rocksdb_iterator_open(&db->handle, &iterator->handle, range, reverse, &options, rocksdb_native__on_iterator_open);
+  err = rocksdb_iterator_open(&db->handle, &req->handle, range, reverse, &options, rocksdb_native__on_iterator_open);
   assert(err == 0);
 
   return NULL;
@@ -468,47 +545,51 @@ rocksdb_native__on_iterator_close(rocksdb_iterator_t *handle, int status) {
 
   assert(status == 0);
 
-  rocksdb_native_iterator_t *iterator = (rocksdb_native_iterator_t *) handle->data;
+  rocksdb_native_iterator_t *req = (rocksdb_native_iterator_t *) handle->data;
 
-  js_env_t *env = iterator->env;
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
 
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
   assert(err == 0);
 
   js_value_t *ctx;
-  err = js_get_reference_value(env, iterator->ctx, &ctx);
+  err = js_get_reference_value(env, req->ctx, &ctx);
   assert(err == 0);
 
   js_value_t *cb;
-  err = js_get_reference_value(env, iterator->on_close, &cb);
+  err = js_get_reference_value(env, req->on_close, &cb);
+  assert(err == 0);
+
+  err = js_delete_reference(env, req->on_open);
+  assert(err == 0);
+
+  err = js_delete_reference(env, req->on_close);
+  assert(err == 0);
+
+  err = js_delete_reference(env, req->on_read);
+  assert(err == 0);
+
+  err = js_delete_reference(env, req->ctx);
   assert(err == 0);
 
   js_value_t *error;
 
-  if (iterator->handle.error) {
-    err = js_create_string_utf8(env, (utf8_t *) iterator->handle.error, -1, &error);
+  if (req->handle.error) {
+    err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
     assert(err == 0);
   } else {
     err = js_get_null(env, &error);
     assert(err == 0);
   }
 
-  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  if (!db->exiting) {
+    js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  }
 
   err = js_close_handle_scope(env, scope);
-  assert(err == 0);
-
-  err = js_delete_reference(env, iterator->on_open);
-  assert(err == 0);
-
-  err = js_delete_reference(env, iterator->on_close);
-  assert(err == 0);
-
-  err = js_delete_reference(env, iterator->on_read);
-  assert(err == 0);
-
-  err = js_delete_reference(env, iterator->ctx);
   assert(err == 0);
 }
 
@@ -524,11 +605,11 @@ rocksdb_native_iterator_close(js_env_t *env, js_callback_info_t *info) {
 
   assert(argc == 1);
 
-  rocksdb_native_iterator_t *iterator;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &iterator, NULL);
+  rocksdb_native_iterator_t *req;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &req, NULL);
   assert(err == 0);
 
-  err = rocksdb_iterator_close(&iterator->handle, rocksdb_native__on_iterator_close);
+  err = rocksdb_iterator_close(&req->handle, rocksdb_native__on_iterator_close);
   assert(err == 0);
 
   return NULL;
@@ -540,23 +621,25 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
 
   assert(status == 0);
 
-  rocksdb_native_iterator_t *iterator = (rocksdb_native_iterator_t *) handle->data;
+  rocksdb_native_iterator_t *req = (rocksdb_native_iterator_t *) handle->data;
 
-  js_env_t *env = iterator->env;
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
 
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
   assert(err == 0);
 
   js_value_t *ctx;
-  err = js_get_reference_value(env, iterator->ctx, &ctx);
+  err = js_get_reference_value(env, req->ctx, &ctx);
   assert(err == 0);
 
   js_value_t *cb;
-  err = js_get_reference_value(env, iterator->on_read, &cb);
+  err = js_get_reference_value(env, req->on_read, &cb);
   assert(err == 0);
 
-  size_t len = iterator->handle.len;
+  size_t len = req->handle.len;
 
   js_value_t *keys;
   err = js_create_array_with_length(env, len, &keys);
@@ -568,8 +651,8 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
 
   js_value_t *error;
 
-  if (iterator->handle.error) {
-    err = js_create_string_utf8(env, (utf8_t *) iterator->handle.error, -1, &error);
+  if (req->handle.error) {
+    err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
     assert(err == 0);
   } else {
     err = js_get_null(env, &error);
@@ -578,7 +661,7 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
     for (size_t i = 0; i < len; i++) {
       js_value_t *result;
 
-      rocksdb_slice_t *key = &iterator->keys[i];
+      rocksdb_slice_t *key = &req->keys[i];
 
       err = js_create_external_arraybuffer(env, (void *) key->data, key->len, rocksdb_native__on_free, NULL, &result);
       assert(err == 0);
@@ -586,7 +669,7 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
       err = js_set_element(env, keys, i, result);
       assert(err == 0);
 
-      rocksdb_slice_t *value = &iterator->values[i];
+      rocksdb_slice_t *value = &req->values[i];
 
       err = js_create_external_arraybuffer(env, (void *) value->data, value->len, rocksdb_native__on_free, NULL, &result);
       assert(err == 0);
@@ -596,7 +679,9 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
     }
   }
 
-  js_call_function_with_checkpoint(env, ctx, cb, 3, (js_value_t *[]) {error, keys, values}, NULL);
+  if (!db->exiting) {
+    js_call_function_with_checkpoint(env, ctx, cb, 3, (js_value_t *[]) {error, keys, values}, NULL);
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -614,15 +699,15 @@ rocksdb_native_iterator_read(js_env_t *env, js_callback_info_t *info) {
 
   assert(argc == 2);
 
-  rocksdb_native_iterator_t *iterator;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &iterator, NULL);
+  rocksdb_native_iterator_t *req;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &req, NULL);
   assert(err == 0);
 
   uint32_t capacity;
   err = js_get_value_uint32(env, argv[1], &capacity);
   assert(err == 0);
 
-  err = rocksdb_iterator_read(&iterator->handle, iterator->keys, iterator->values, capacity, rocksdb_native__on_iterator_read);
+  err = rocksdb_iterator_read(&req->handle, req->keys, req->values, capacity, rocksdb_native__on_iterator_read);
   assert(err == 0);
 
   return NULL;
@@ -634,12 +719,12 @@ rocksdb_native_read_init(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t *handle;
 
-  rocksdb_native_read_batch_t *batch;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_read_batch_t), (void **) &batch, &handle);
+  rocksdb_native_read_batch_t *req;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_read_batch_t), (void **) &req, &handle);
   assert(err == 0);
 
-  batch->env = env;
-  batch->handle.data = (void *) batch;
+  req->env = env;
+  req->handle.data = (void *) req;
 
   return handle;
 }
@@ -656,8 +741,8 @@ rocksdb_native_read_buffer(js_env_t *env, js_callback_info_t *info) {
 
   assert(argc == 2);
 
-  rocksdb_native_read_batch_t *batch;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &batch, NULL);
+  rocksdb_native_read_batch_t *req;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &req, NULL);
   assert(err == 0);
 
   uint32_t capacity;
@@ -670,15 +755,15 @@ rocksdb_native_read_buffer(js_env_t *env, js_callback_info_t *info) {
   err = js_create_arraybuffer(env, capacity * sizeof(rocksdb_read_t) + capacity * sizeof(char *), (void **) &data, &handle);
   assert(err == 0);
 
-  batch->capacity = capacity;
+  req->capacity = capacity;
 
   size_t offset = 0;
 
-  batch->reads = (rocksdb_read_t *) &data[offset];
+  req->reads = (rocksdb_read_t *) &data[offset];
 
   offset += capacity * sizeof(rocksdb_read_t);
 
-  batch->errors = (char **) &data[offset];
+  req->errors = (char **) &data[offset];
 
   return handle;
 }
@@ -689,15 +774,17 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
 
   assert(status == 0);
 
-  rocksdb_native_read_batch_t *batch = (rocksdb_native_read_batch_t *) handle->data;
+  rocksdb_native_read_batch_t *req = (rocksdb_native_read_batch_t *) handle->data;
 
-  js_env_t *env = batch->env;
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
 
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
   assert(err == 0);
 
-  size_t len = batch->handle.len;
+  size_t len = req->handle.len;
 
   js_value_t *errors;
   err = js_create_array_with_length(env, len, &errors);
@@ -710,7 +797,7 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
   for (size_t i = 0; i < len; i++) {
     js_value_t *result;
 
-    char *error = batch->errors[i];
+    char *error = req->errors[i];
 
     if (error) {
       err = js_create_string_utf8(env, (utf8_t *) error, -1, &result);
@@ -719,7 +806,7 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
       err = js_set_element(env, errors, i, result);
       assert(err == 0);
     } else {
-      rocksdb_slice_t *slice = &batch->reads[i].value;
+      rocksdb_slice_t *slice = &req->reads[i].value;
 
       err = js_create_external_arraybuffer(env, (void *) slice->data, slice->len, rocksdb_native__on_free, NULL, &result);
       assert(err == 0);
@@ -730,20 +817,22 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
   }
 
   js_value_t *ctx;
-  err = js_get_reference_value(env, batch->ctx, &ctx);
+  err = js_get_reference_value(env, req->ctx, &ctx);
   assert(err == 0);
 
   js_value_t *cb;
-  err = js_get_reference_value(env, batch->on_status, &cb);
+  err = js_get_reference_value(env, req->on_status, &cb);
   assert(err == 0);
 
-  err = js_delete_reference(env, batch->on_status);
+  err = js_delete_reference(env, req->on_status);
   assert(err == 0);
 
-  err = js_delete_reference(env, batch->ctx);
+  err = js_delete_reference(env, req->ctx);
   assert(err == 0);
 
-  js_call_function_with_checkpoint(env, ctx, cb, 2, (js_value_t *[]) {errors, values}, NULL);
+  if (!db->exiting) {
+    js_call_function_with_checkpoint(env, ctx, cb, 2, (js_value_t *[]) {errors, values}, NULL);
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -765,18 +854,18 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
   err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
   assert(err == 0);
 
-  rocksdb_native_read_batch_t *batch;
-  err = js_get_arraybuffer_info(env, argv[1], (void **) &batch, NULL);
+  rocksdb_native_read_batch_t *req;
+  err = js_get_arraybuffer_info(env, argv[1], (void **) &req, NULL);
   assert(err == 0);
 
   uint32_t len;
   err = js_get_array_length(env, argv[2], &len);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[4], 1, &batch->ctx);
+  err = js_create_reference(env, argv[4], 1, &req->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[5], 1, &batch->on_status);
+  err = js_create_reference(env, argv[5], 1, &req->on_status);
   assert(err == 0);
 
   for (uint32_t i = 0; i < len; i++) {
@@ -792,11 +881,11 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
     err = js_get_value_uint32(env, property, &type);
     assert(err == 0);
 
-    batch->reads[i].type = type;
+    req->reads[i].type = type;
 
     switch (type) {
     case rocksdb_get: {
-      rocksdb_slice_t *key = &batch->reads[i].key;
+      rocksdb_slice_t *key = &req->reads[i].key;
 
       err = js_get_named_property(env, read, "key", &property);
       assert(err == 0);
@@ -821,7 +910,7 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
     assert(err == 0);
   }
 
-  err = rocksdb_read(&db->handle, &batch->handle, batch->reads, batch->errors, len, &options, rocksdb_native__on_read);
+  err = rocksdb_read(&db->handle, &req->handle, req->reads, req->errors, len, &options, rocksdb_native__on_read);
   assert(err == 0);
 
   return NULL;
@@ -855,8 +944,8 @@ rocksdb_native_write_buffer(js_env_t *env, js_callback_info_t *info) {
 
   assert(argc == 2);
 
-  rocksdb_native_write_batch_t *batch;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &batch, NULL);
+  rocksdb_native_write_batch_t *req;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &req, NULL);
   assert(err == 0);
 
   uint32_t capacity;
@@ -869,15 +958,15 @@ rocksdb_native_write_buffer(js_env_t *env, js_callback_info_t *info) {
   err = js_create_arraybuffer(env, capacity * sizeof(rocksdb_write_t) + capacity * sizeof(char *), (void **) &data, &handle);
   assert(err == 0);
 
-  batch->capacity = capacity;
+  req->capacity = capacity;
 
   size_t offset = 0;
 
-  batch->writes = (rocksdb_write_t *) &data[offset];
+  req->writes = (rocksdb_write_t *) &data[offset];
 
   offset += capacity * sizeof(rocksdb_write_t);
 
-  batch->errors = (char **) &data[offset];
+  req->errors = (char **) &data[offset];
 
   return handle;
 }
@@ -888,9 +977,11 @@ rocksdb_native__on_write(rocksdb_write_batch_t *handle, int status) {
 
   assert(status == 0);
 
-  rocksdb_native_write_batch_t *batch = (rocksdb_native_write_batch_t *) handle->data;
+  rocksdb_native_write_batch_t *req = (rocksdb_native_write_batch_t *) handle->data;
 
-  js_env_t *env = batch->env;
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
 
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
@@ -898,8 +989,8 @@ rocksdb_native__on_write(rocksdb_write_batch_t *handle, int status) {
 
   js_value_t *error;
 
-  if (batch->handle.error) {
-    err = js_create_string_utf8(env, (utf8_t *) batch->handle.error, -1, &error);
+  if (req->handle.error) {
+    err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
     assert(err == 0);
   } else {
     err = js_get_null(env, &error);
@@ -907,20 +998,22 @@ rocksdb_native__on_write(rocksdb_write_batch_t *handle, int status) {
   }
 
   js_value_t *ctx;
-  err = js_get_reference_value(env, batch->ctx, &ctx);
+  err = js_get_reference_value(env, req->ctx, &ctx);
   assert(err == 0);
 
   js_value_t *cb;
-  err = js_get_reference_value(env, batch->on_status, &cb);
+  err = js_get_reference_value(env, req->on_status, &cb);
   assert(err == 0);
 
-  err = js_delete_reference(env, batch->on_status);
+  err = js_delete_reference(env, req->on_status);
   assert(err == 0);
 
-  err = js_delete_reference(env, batch->ctx);
+  err = js_delete_reference(env, req->ctx);
   assert(err == 0);
 
-  js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  if (!db->exiting) {
+    js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -942,18 +1035,18 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
   err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
   assert(err == 0);
 
-  rocksdb_native_write_batch_t *batch;
-  err = js_get_arraybuffer_info(env, argv[1], (void **) &batch, NULL);
+  rocksdb_native_write_batch_t *req;
+  err = js_get_arraybuffer_info(env, argv[1], (void **) &req, NULL);
   assert(err == 0);
 
   uint32_t len;
   err = js_get_array_length(env, argv[2], &len);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[3], 1, &batch->ctx);
+  err = js_create_reference(env, argv[3], 1, &req->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[4], 1, &batch->on_status);
+  err = js_create_reference(env, argv[4], 1, &req->on_status);
   assert(err == 0);
 
   for (uint32_t i = 0; i < len; i++) {
@@ -969,11 +1062,11 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
     err = js_get_value_uint32(env, property, &type);
     assert(err == 0);
 
-    batch->writes[i].type = type;
+    req->writes[i].type = type;
 
     switch (type) {
     case rocksdb_put: {
-      rocksdb_slice_t *key = &batch->writes[i].key;
+      rocksdb_slice_t *key = &req->writes[i].key;
 
       err = js_get_named_property(env, write, "key", &property);
       assert(err == 0);
@@ -981,7 +1074,7 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
       err = js_get_typedarray_info(env, property, NULL, (void **) &key->data, &key->len, NULL, NULL);
       assert(err == 0);
 
-      rocksdb_slice_t *value = &batch->writes[i].value;
+      rocksdb_slice_t *value = &req->writes[i].value;
 
       err = js_get_named_property(env, write, "value", &property);
       assert(err == 0);
@@ -992,7 +1085,7 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
     }
 
     case rocksdb_delete: {
-      rocksdb_slice_t *key = &batch->writes[i].key;
+      rocksdb_slice_t *key = &req->writes[i].key;
 
       err = js_get_named_property(env, write, "key", &property);
       assert(err == 0);
@@ -1003,7 +1096,7 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
     }
 
     case rocksdb_delete_range: {
-      rocksdb_slice_t *start = &batch->writes[i].start;
+      rocksdb_slice_t *start = &req->writes[i].start;
 
       err = js_get_named_property(env, write, "start", &property);
       assert(err == 0);
@@ -1011,7 +1104,7 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
       err = js_get_typedarray_info(env, property, NULL, (void **) &start->data, &start->len, NULL, NULL);
       assert(err == 0);
 
-      rocksdb_slice_t *end = &batch->writes[i].end;
+      rocksdb_slice_t *end = &req->writes[i].end;
 
       err = js_get_named_property(env, write, "end", &property);
       assert(err == 0);
@@ -1023,7 +1116,7 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
     }
   }
 
-  err = rocksdb_write(&db->handle, &batch->handle, batch->writes, len, NULL, rocksdb_native__on_write);
+  err = rocksdb_write(&db->handle, &req->handle, req->writes, len, NULL, rocksdb_native__on_write);
   assert(err == 0);
 
   return NULL;
