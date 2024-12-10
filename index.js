@@ -81,8 +81,6 @@ module.exports = class RocksDB extends ReadyResource {
 
     req.handle = binding.open(this._handle, this.path, opts, req, onopen)
 
-    RocksDB._instances.add(this)
-
     await promise
 
     for (const snapshot of this._snapshots) snapshot._init()
@@ -110,8 +108,6 @@ module.exports = class RocksDB extends ReadyResource {
     })
 
     req.handle = binding.close(this._handle, req, onclose)
-
-    RocksDB._instances.delete(this)
 
     await promise
 
@@ -211,14 +207,4 @@ module.exports = class RocksDB extends ReadyResource {
     batch.deleteRange(start, end)
     await batch.flush()
   }
-
-  static _instances = new Set()
-}
-
-if (typeof Bare !== 'undefined') {
-  Bare.on('exit', async () => {
-    for (const db of exports._instances) {
-      await db.close()
-    }
-  })
 }
