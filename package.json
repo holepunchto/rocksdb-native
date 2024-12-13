@@ -1,6 +1,6 @@
 {
   "name": "rocksdb-native",
-  "version": "2.6.7",
+  "version": "2.6.8",
   "description": "librocksdb bindings for JavaScript",
   "exports": {
     ".": "./index.js",
