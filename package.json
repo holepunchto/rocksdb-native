@@ -12,7 +12,8 @@
     "binding.js",
     "CMakeLists.txt",
     "lib",
-    "prebuilds"
+    "prebuilds",
+    "!prebuilds/android-*/**/*.node"
   ],
   "addon": true,
   "scripts": {
