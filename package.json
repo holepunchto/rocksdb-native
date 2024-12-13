@@ -24,7 +24,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/holepunchto/rocksdb-native.git"
+    "url": "git+https://github.com/holepunchto/rocksdb-native.git"
   },
   "author": "Holepunch Inc",
   "license": "Apache-2.0",
