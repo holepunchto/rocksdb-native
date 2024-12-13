@@ -29,6 +29,7 @@ typedef struct {
   rocksdb_t handle;
 
   js_env_t *env;
+  js_ref_t *ctx;
 
   bool closing;
   bool exiting;
@@ -126,6 +127,9 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
 
       err = js_delete_reference(env, req->ctx);
       assert(err == 0);
+
+      err = js_delete_reference(env, db->ctx);
+      assert(err == 0);
     } else {
       free(req);
     }
@@ -146,6 +150,9 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
     assert(err == 0);
 
     err = js_delete_reference(env, req->ctx);
+    assert(err == 0);
+
+    err = js_delete_reference(env, db->ctx);
     assert(err == 0);
 
     js_call_function_with_checkpoint(env, ctx, cb, 0, NULL, NULL);
@@ -265,24 +272,24 @@ static js_value_t *
 rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 5;
-  js_value_t *argv[5];
+  size_t argc = 6;
+  js_value_t *argv[6];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 5);
+  assert(argc == 6);
 
   rocksdb_native_t *db;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
+  err = js_get_arraybuffer_info(env, argv[1], (void **) &db, NULL);
   assert(err == 0);
 
   utf8_t path[4096 + 1 /* NULL */];
-  err = js_get_value_string_utf8(env, argv[1], path, sizeof(path), NULL);
+  err = js_get_value_string_utf8(env, argv[2], path, sizeof(path), NULL);
   assert(err == 0);
 
   rocksdb_native_open_options_t *o;
-  err = js_get_typedarray_info(env, argv[2], NULL, (void **) &o, NULL, NULL, NULL);
+  err = js_get_typedarray_info(env, argv[3], NULL, (void **) &o, NULL, NULL, NULL);
   assert(err == 0);
 
   rocksdb_options_t options = {
@@ -310,10 +317,13 @@ rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
   req->env = env;
   req->handle.data = (void *) req;
 
-  err = js_create_reference(env, argv[3], 1, &req->ctx);
+  err = js_create_reference(env, argv[0], 1, &db->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[4], 1, &req->on_open);
+  err = js_create_reference(env, argv[4], 1, &req->ctx);
+  assert(err == 0);
+
+  err = js_create_reference(env, argv[5], 1, &req->on_open);
   assert(err == 0);
 
   err = rocksdb_open(&db->handle, &req->handle, (const char *) path, &options, rocksdb_native__on_open);

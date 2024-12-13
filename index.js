@@ -79,7 +79,7 @@ module.exports = class RocksDB extends ReadyResource {
       req.reject = reject
     })
 
-    req.handle = binding.open(this._handle, this.path, opts, req, onopen)
+    req.handle = binding.open(this, this._handle, this.path, opts, req, onopen)
 
     await promise
 
