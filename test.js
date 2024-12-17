@@ -18,12 +18,14 @@ test('write + read', async (t) => {
     const batch = db.write()
     const p = batch.put('hello', 'world')
     await batch.flush()
+    batch.destroy()
     await t.execution(p)
   }
   {
     const batch = db.read()
     const p = batch.get('hello')
     await batch.flush()
+    batch.destroy()
     t.alike(await p, b4a.from('world'))
   }
 
@@ -43,6 +45,7 @@ test('write + read multiple', async (t) => {
     }
 
     await batch.flush()
+    batch.destroy()
 
     await t.execution(await Promise.all(p))
   }
@@ -55,6 +58,7 @@ test('write + read multiple', async (t) => {
     }
 
     await batch.flush()
+    batch.destroy()
 
     t.alike(
       await Promise.all(p),
@@ -72,6 +76,7 @@ test('read missing', async (t) => {
   const batch = db.read()
   const p = batch.get('hello')
   await batch.flush()
+  batch.destroy()
   t.alike(await p, null)
 
   await db.close()
@@ -85,6 +90,7 @@ test('read with snapshot', async (t) => {
     const batch = db.write()
     const p = batch.put('hello', 'world')
     await batch.flush()
+    batch.destroy()
     await t.execution(p)
   }
 
@@ -94,12 +100,14 @@ test('read with snapshot', async (t) => {
     const batch = db.write()
     const p = batch.put('hello', 'earth')
     await batch.flush()
+    batch.destroy()
     await t.execution(p)
   }
   {
     const batch = db.read({ snapshot })
     const p = batch.get('hello')
     await batch.flush()
+    batch.destroy()
     t.alike(await p, b4a.from('world'))
   }
 
@@ -111,7 +119,7 @@ test('delete range', async (t) => {
   await db.ready()
 
   {
-    const batch = db.write()
+    let batch = db.write()
     batch.put('aa', 'aa')
     batch.put('ab', 'ab')
     batch.put('ba', 'ba')
@@ -119,11 +127,10 @@ test('delete range', async (t) => {
     batch.put('bc', 'bc')
     batch.put('ac', 'ac')
     await batch.flush()
-  }
-  {
-    const batch = db.write()
+
     batch.deleteRange('a', 'b')
     await batch.flush()
+    batch.destroy()
   }
   {
     const batch = db.read()
@@ -135,6 +142,7 @@ test('delete range', async (t) => {
     p.push(batch.get('bb'))
     p.push(batch.get('bc'))
     await batch.flush()
+    batch.destroy()
 
     t.alike(await Promise.all(p), [
       null,
@@ -159,11 +167,13 @@ test('delete range, end does not exist', async (t) => {
     batch.put('ab', 'ab')
     batch.put('ac', 'ac')
     await batch.flush()
+    batch.destroy()
   }
   {
     const batch = db.write()
     batch.deleteRange('a', 'b')
     await batch.flush()
+    batch.destroy()
   }
   {
     const batch = db.read()
@@ -172,6 +182,7 @@ test('delete range, end does not exist', async (t) => {
     p.push(batch.get('ab'))
     p.push(batch.get('ac'))
     await batch.flush()
+    batch.destroy()
 
     t.alike(await Promise.all(p), [null, null, null])
   }
@@ -190,6 +201,7 @@ test('prefix iterator', async (t) => {
   batch.put('bb', 'bb')
   batch.put('ac', 'ac')
   await batch.flush()
+  batch.destroy()
 
   const entries = []
 
@@ -217,6 +229,7 @@ test('prefix iterator, reverse', async (t) => {
   batch.put('bb', 'bb')
   batch.put('ac', 'ac')
   await batch.flush()
+  batch.destroy()
 
   const entries = []
 
@@ -247,6 +260,7 @@ test('prefix iterator, reverse with limit', async (t) => {
   batch.put('bb', 'bb')
   batch.put('ac', 'ac')
   await batch.flush()
+  batch.destroy()
 
   const entries = []
 
@@ -271,6 +285,7 @@ test('iterator with encoding', async (t) => {
   batch.put('b', 'world')
   batch.put('c', '!')
   await batch.flush()
+  batch.destroy()
 
   const entries = []
 
@@ -293,23 +308,19 @@ test('iterator with snapshot', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  {
-    const batch = db.write()
-    batch.put('aa', 'aa')
-    batch.put('ab', 'ab')
-    batch.put('ac', 'ac')
-    await batch.flush()
-  }
+  let batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ac', 'ac')
+  await batch.flush()
 
   const snapshot = db.snapshot()
 
-  {
-    const batch = db.write()
-    batch.put('aa', 'ba')
-    batch.put('ab', 'bb')
-    batch.put('ac', 'bc')
-    await batch.flush()
-  }
+  batch.put('aa', 'ba')
+  batch.put('ab', 'bb')
+  batch.put('ac', 'bc')
+  await batch.flush()
+  batch.destroy()
 
   const entries = []
 
@@ -340,6 +351,7 @@ test('iterator with snapshot before db open', async (t) => {
   batch.put('ab', 'bb')
   batch.put('ac', 'bc')
   await batch.flush()
+  batch.destroy()
 
   const entries = []
 
@@ -373,6 +385,7 @@ test('peek', async (t) => {
   batch.put('ab', 'ab')
   batch.put('ac', 'ac')
   await batch.flush()
+  batch.destroy()
 
   t.alike(await db.peek({ gte: 'a', lt: 'b' }), {
     key: b4a.from('aa'),
@@ -391,6 +404,7 @@ test('peek, reverse', async (t) => {
   batch.put('ab', 'ab')
   batch.put('ac', 'ac')
   await batch.flush()
+  batch.destroy()
 
   t.alike(await db.peek({ gte: 'a', lt: 'b' }, { reverse: true }), {
     key: b4a.from('ac'),
@@ -405,18 +419,17 @@ test('delete', async (t) => {
   await db.ready()
 
   {
-    const batch = db.write()
+    let batch = db.write()
     batch.put('hello', 'world')
     batch.put('next', 'value')
     batch.put('another', 'entry')
     await batch.flush()
-  }
-  {
-    const batch = db.write()
+
     batch.delete('hello')
     batch.delete('next')
     batch.delete('another')
     await batch.flush()
+    batch.destroy()
   }
   {
     const batch = db.read()
@@ -425,6 +438,7 @@ test('delete', async (t) => {
     p.push(batch.get('next'))
     p.push(batch.get('another'))
     await batch.flush()
+    batch.destroy()
     t.alike(await Promise.all(p), [null, null, null])
   }
 
@@ -447,6 +461,7 @@ test('idle', async function (t) {
     const idle = db.idle()
 
     await b.flush()
+    b.destroy()
 
     await t.execution(idle)
     t.ok(db.isIdle())
@@ -479,14 +494,18 @@ test('idle', async function (t) {
 
     b3.tryFlush()
 
+    t.alike(await node1, b4a.from('world'))
+    t.alike(await node2, b4a.from('value'))
+    t.alike(await node3, b4a.from('entry'))
+
+    b1.destroy()
+    b2.destroy()
+    b3.destroy()
+
     await t.execution(promise)
 
     t.ok(idle)
     t.ok(db.isIdle())
-
-    t.alike(await node1, b4a.from('world'))
-    t.alike(await node2, b4a.from('value'))
-    t.alike(await node3, b4a.from('entry'))
   }
 
   await db.close()
@@ -502,54 +521,6 @@ test('write + read after close', async (t) => {
   t.exception(() => db.write())
 })
 
-test('batch autoDestroy', async (t) => {
-  const db = new RocksDB(await tmp(t))
-  await db.ready()
-
-  {
-    const batch = db.write()
-    batch.put('aa', 'aa')
-    await batch.flush()
-
-    batch.put('aa', 'ba')
-    await t.exception(() => batch.flush())
-  }
-
-  {
-    const read = db.read()
-    const p = read.get('aa')
-    read.tryFlush()
-
-    t.alike(await p, b4a.from('aa'))
-  }
-
-  const batch = db.write({ autoDestroy: false })
-  batch.put('ab', 'ab')
-  await batch.flush()
-
-  {
-    const read = db.read()
-    const p = read.get('ab')
-    read.tryFlush()
-
-    t.alike(await p, b4a.from('ab'))
-  }
-
-  batch.put('ab', 'bb')
-  await t.execution(() => batch.flush())
-
-  {
-    const read = db.read()
-    const p = read.get('ab')
-    read.tryFlush()
-
-    t.alike(await p, b4a.from('bb'))
-  }
-
-  batch.destroy()
-  await db.close()
-})
-
 test('column families, batch per family', async (t) => {
   const a = new RocksDB.ColumnFamily('a')
   const b = new RocksDB.ColumnFamily('b')
@@ -561,24 +532,28 @@ test('column families, batch per family', async (t) => {
     const batch = db.write({ columnFamily: a })
     batch.put('key', 'a')
     await batch.flush()
+    batch.destroy()
   }
   {
     const batch = db.write({ columnFamily: b })
     batch.put('key', 'b')
     await batch.flush()
+    batch.destroy()
   }
 
   {
-    const read = db.read({ columnFamily: a })
-    const p = read.get('key')
-    read.tryFlush()
+    const batch = db.read({ columnFamily: a })
+    const p = batch.get('key')
+    batch.tryFlush()
     t.alike(await p, b4a.from('a'))
+    batch.destroy()
   }
   {
-    const read = db.read({ columnFamily: b })
-    const p = read.get('key')
-    read.tryFlush()
+    const batch = db.read({ columnFamily: b })
+    const p = batch.get('key')
+    batch.tryFlush()
     t.alike(await p, b4a.from('b'))
+    batch.destroy()
   }
 
   await db.close()
@@ -596,15 +571,17 @@ test('column families, operation per family', async (t) => {
     batch.put('key', 'a', { columnFamily: a })
     batch.put('key', 'b', { columnFamily: b })
     await batch.flush()
+    batch.destroy()
   }
 
   {
-    const read = db.read()
-    const p = read.get('key', { columnFamily: a })
-    const q = read.get('key', { columnFamily: b })
-    read.tryFlush()
+    const batch = db.read()
+    const p = batch.get('key', { columnFamily: a })
+    const q = batch.get('key', { columnFamily: b })
+    batch.tryFlush()
     t.alike(await p, b4a.from('a'))
     t.alike(await q, b4a.from('b'))
+    batch.destroy()
   }
 
   await db.close()
