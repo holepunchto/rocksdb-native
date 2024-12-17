@@ -161,15 +161,12 @@ test('delete range, end does not exist', async (t) => {
   await db.ready()
 
   {
-    const batch = db.write()
+    let batch = db.write()
     batch.put('aa', 'aa')
     batch.put('ab', 'ab')
     batch.put('ac', 'ac')
     await batch.flush()
-    batch.destroy()
-  }
-  {
-    const batch = db.write()
+
     batch.deleteRange('a', 'b')
     await batch.flush()
     batch.destroy()
