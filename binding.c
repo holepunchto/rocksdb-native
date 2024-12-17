@@ -1387,12 +1387,12 @@ rocksdb_native_write_init(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t *handle;
 
-  rocksdb_native_write_batch_t *batch;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_write_batch_t), (void **) &batch, &handle);
+  rocksdb_native_write_batch_t *req;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_write_batch_t), (void **) &req, &handle);
   assert(err == 0);
 
-  batch->env = env;
-  batch->handle.data = (void *) batch;
+  req->env = env;
+  req->handle.data = (void *) req;
 
   return handle;
 }
