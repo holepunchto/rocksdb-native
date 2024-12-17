@@ -26,6 +26,8 @@ module.exports = class RocksDB extends ReadyResource {
     this._refs = 0
     this._resolvePreclose = null
     this._resolveOnIdle = null
+    this._suspending = null
+    this._resuming = null
     this._idlePromise = null
 
     this._handle = binding.init(
@@ -124,6 +126,62 @@ module.exports = class RocksDB extends ReadyResource {
       const resolve = this._resolvePreclose
       this._resolvePreclose = null
       resolve()
+    }
+  }
+
+  async suspend() {
+    if (this.opened === false) await this.ready()
+    if (this._suspending === null) this._suspending = this._suspend()
+    return this._suspending
+  }
+
+  async _suspend() {
+    if (this._resuming) await this._resuming
+
+    const req = { resolve: null, reject: null, handle: null }
+
+    const promise = new Promise((resolve, reject) => {
+      req.resolve = resolve
+      req.reject = reject
+    })
+
+    req.handle = binding.suspend(this._handle, req, onsuspend)
+
+    await promise
+
+    this._suspending = null
+
+    function onsuspend(err) {
+      if (err) req.reject(new Error(err))
+      else req.resolve()
+    }
+  }
+
+  async resume() {
+    if (this.opened === false) await this.ready()
+    if (this._resuming === null) this._resuming = this._resume()
+    return this._resuming
+  }
+
+  async _resume() {
+    if (this._suspending) await this._suspending
+
+    const req = { resolve: null, reject: null, handle: null }
+
+    const promise = new Promise((resolve, reject) => {
+      req.resolve = resolve
+      req.reject = reject
+    })
+
+    req.handle = binding.resume(this._handle, req, onresume)
+
+    await promise
+
+    this._resuming = null
+
+    function onresume(err) {
+      if (err) req.reject(new Error(err))
+      else req.resolve()
     }
   }
 

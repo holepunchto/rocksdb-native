@@ -71,6 +71,22 @@ typedef struct {
 } rocksdb_native_close_t;
 
 typedef struct {
+  rocksdb_suspend_t handle;
+
+  js_env_t *env;
+  js_ref_t *ctx;
+  js_ref_t *on_suspend;
+} rocksdb_native_suspend_t;
+
+typedef struct {
+  rocksdb_resume_t handle;
+
+  js_env_t *env;
+  js_ref_t *ctx;
+  js_ref_t *on_resume;
+} rocksdb_native_resume_t;
+
+typedef struct {
   rocksdb_iterator_t handle;
 
   rocksdb_slice_t *keys;
@@ -130,65 +146,6 @@ rocksdb_native__on_free(js_env_t *env, void *data, void *finalize_hint) {
 
 static void
 rocksdb_native__on_column_family_teardown(void *data);
-
-static void
-rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
-  int err;
-
-  assert(status == 0);
-
-  rocksdb_native_close_t *req = (rocksdb_native_close_t *) handle->data;
-
-  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
-
-  js_env_t *env = req->env;
-
-  js_deferred_teardown_t *teardown = db->teardown;
-
-  if (db->exiting) {
-    if (db->closing) {
-      err = js_delete_reference(env, req->on_close);
-      assert(err == 0);
-
-      err = js_delete_reference(env, req->ctx);
-      assert(err == 0);
-
-      err = js_delete_reference(env, db->ctx);
-      assert(err == 0);
-    } else {
-      free(req);
-    }
-  } else {
-    js_handle_scope_t *scope;
-    err = js_open_handle_scope(env, &scope);
-    assert(err == 0);
-
-    js_value_t *ctx;
-    err = js_get_reference_value(env, req->ctx, &ctx);
-    assert(err == 0);
-
-    js_value_t *cb;
-    err = js_get_reference_value(env, req->on_close, &cb);
-    assert(err == 0);
-
-    err = js_delete_reference(env, req->on_close);
-    assert(err == 0);
-
-    err = js_delete_reference(env, req->ctx);
-    assert(err == 0);
-
-    err = js_delete_reference(env, db->ctx);
-    assert(err == 0);
-
-    js_call_function_with_checkpoint(env, ctx, cb, 0, NULL, NULL);
-
-    err = js_close_handle_scope(env, scope);
-    assert(err == 0);
-  }
-
-  err = js_finish_deferred_teardown_callback(teardown);
-  assert(err == 0);
-}
 
 static void
 rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
@@ -279,6 +236,65 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
   free((void *) handle->column_families);
 
   free(handle->handles);
+}
+
+static void
+rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  rocksdb_native_close_t *req = (rocksdb_native_close_t *) handle->data;
+
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
+
+  js_deferred_teardown_t *teardown = db->teardown;
+
+  if (db->exiting) {
+    if (db->closing) {
+      err = js_delete_reference(env, req->on_close);
+      assert(err == 0);
+
+      err = js_delete_reference(env, req->ctx);
+      assert(err == 0);
+
+      err = js_delete_reference(env, db->ctx);
+      assert(err == 0);
+    } else {
+      free(req);
+    }
+  } else {
+    js_handle_scope_t *scope;
+    err = js_open_handle_scope(env, &scope);
+    assert(err == 0);
+
+    js_value_t *ctx;
+    err = js_get_reference_value(env, req->ctx, &ctx);
+    assert(err == 0);
+
+    js_value_t *cb;
+    err = js_get_reference_value(env, req->on_close, &cb);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->on_close);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->ctx);
+    assert(err == 0);
+
+    err = js_delete_reference(env, db->ctx);
+    assert(err == 0);
+
+    js_call_function_with_checkpoint(env, ctx, cb, 0, NULL, NULL);
+
+    err = js_close_handle_scope(env, scope);
+    assert(err == 0);
+  }
+
+  err = js_finish_deferred_teardown_callback(teardown);
+  assert(err == 0);
 }
 
 static void
@@ -452,6 +468,192 @@ rocksdb_native_close(js_env_t *env, js_callback_info_t *info) {
   db->closing = true;
 
   err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_close);
+  assert(err == 0);
+
+  return handle;
+}
+
+static void
+rocksdb_native__on_suspend(rocksdb_suspend_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  rocksdb_native_suspend_t *req = (rocksdb_native_suspend_t *) handle->data;
+
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
+
+  js_deferred_teardown_t *teardown = db->teardown;
+
+  if (db->exiting) {
+    err = js_delete_reference(env, req->on_suspend);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->ctx);
+    assert(err == 0);
+  } else {
+    js_handle_scope_t *scope;
+    err = js_open_handle_scope(env, &scope);
+    assert(err == 0);
+
+    js_value_t *ctx;
+    err = js_get_reference_value(env, req->ctx, &ctx);
+    assert(err == 0);
+
+    js_value_t *cb;
+    err = js_get_reference_value(env, req->on_suspend, &cb);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->on_suspend);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->ctx);
+    assert(err == 0);
+
+    js_value_t *error;
+
+    if (req->handle.error) {
+      err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
+      assert(err == 0);
+    } else {
+      err = js_get_null(env, &error);
+      assert(err == 0);
+    }
+
+    js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+
+    err = js_close_handle_scope(env, scope);
+    assert(err == 0);
+  }
+}
+
+static js_value_t *
+rocksdb_native_suspend(js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  size_t argc = 3;
+  js_value_t *argv[3];
+
+  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  assert(err == 0);
+
+  assert(argc == 3);
+
+  rocksdb_native_t *db;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
+  assert(err == 0);
+
+  js_value_t *handle;
+
+  rocksdb_native_suspend_t *req;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_suspend_t), (void **) &req, &handle);
+  assert(err == 0);
+
+  req->env = env;
+  req->handle.data = (void *) req;
+
+  err = js_create_reference(env, argv[1], 1, &req->ctx);
+  assert(err == 0);
+
+  err = js_create_reference(env, argv[2], 1, &req->on_suspend);
+  assert(err == 0);
+
+  err = rocksdb_suspend(&db->handle, &req->handle, rocksdb_native__on_suspend);
+  assert(err == 0);
+
+  return handle;
+}
+
+static void
+rocksdb_native__on_resume(rocksdb_resume_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  rocksdb_native_resume_t *req = (rocksdb_native_resume_t *) handle->data;
+
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
+
+  js_deferred_teardown_t *teardown = db->teardown;
+
+  if (db->exiting) {
+    err = js_delete_reference(env, req->on_resume);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->ctx);
+    assert(err == 0);
+  } else {
+    js_handle_scope_t *scope;
+    err = js_open_handle_scope(env, &scope);
+    assert(err == 0);
+
+    js_value_t *ctx;
+    err = js_get_reference_value(env, req->ctx, &ctx);
+    assert(err == 0);
+
+    js_value_t *cb;
+    err = js_get_reference_value(env, req->on_resume, &cb);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->on_resume);
+    assert(err == 0);
+
+    err = js_delete_reference(env, req->ctx);
+    assert(err == 0);
+
+    js_value_t *error;
+
+    if (req->handle.error) {
+      err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
+      assert(err == 0);
+    } else {
+      err = js_get_null(env, &error);
+      assert(err == 0);
+    }
+
+    js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+
+    err = js_close_handle_scope(env, scope);
+    assert(err == 0);
+  }
+}
+
+static js_value_t *
+rocksdb_native_resume(js_env_t *env, js_callback_info_t *info) {
+  int err;
+
+  size_t argc = 3;
+  js_value_t *argv[3];
+
+  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  assert(err == 0);
+
+  assert(argc == 3);
+
+  rocksdb_native_t *db;
+  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
+  assert(err == 0);
+
+  js_value_t *handle;
+
+  rocksdb_native_resume_t *req;
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_resume_t), (void **) &req, &handle);
+  assert(err == 0);
+
+  req->env = env;
+  req->handle.data = (void *) req;
+
+  err = js_create_reference(env, argv[1], 1, &req->ctx);
+  assert(err == 0);
+
+  err = js_create_reference(env, argv[2], 1, &req->on_resume);
+  assert(err == 0);
+
+  err = rocksdb_resume(&db->handle, &req->handle, rocksdb_native__on_resume);
   assert(err == 0);
 
   return handle;
@@ -1466,6 +1668,8 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("init", rocksdb_native_init)
   V("open", rocksdb_native_open)
   V("close", rocksdb_native_close)
+  V("suspend", rocksdb_native_suspend)
+  V("resume", rocksdb_native_resume)
 
   V("columnFamilyInit", rocksdb_native_column_family_init)
   V("columnFamilyDestroy", rocksdb_native_column_family_destroy)
