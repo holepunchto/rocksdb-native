@@ -1,7 +1,6 @@
 const test = require('brittle')
 const tmp = require('test-tmp')
 const c = require('compact-encoding')
-const b4a = require('b4a')
 const RocksDB = require('.')
 
 test('open + close', async (t) => {
@@ -26,7 +25,7 @@ test('write + read', async (t) => {
     const p = batch.get('hello')
     await batch.flush()
     batch.destroy()
-    t.alike(await p, b4a.from('world'))
+    t.alike(await p, Buffer.from('world'))
   }
 
   await db.close()
@@ -62,7 +61,7 @@ test('write + read multiple', async (t) => {
 
     t.alike(
       await Promise.all(p),
-      new Array(100).fill(0).map((_, i) => b4a.from(`${i}`))
+      new Array(100).fill(0).map((_, i) => Buffer.from(`${i}`))
     )
   }
 
@@ -108,7 +107,7 @@ test('read with snapshot', async (t) => {
     const p = batch.get('hello')
     await batch.flush()
     batch.destroy()
-    t.alike(await p, b4a.from('world'))
+    t.alike(await p, Buffer.from('world'))
   }
 
   await db.close()
@@ -210,9 +209,9 @@ test('prefix iterator', async (t) => {
   }
 
   t.alike(entries, [
-    { key: b4a.from('aa'), value: b4a.from('aa') },
-    { key: b4a.from('ab'), value: b4a.from('ab') },
-    { key: b4a.from('ac'), value: b4a.from('ac') }
+    { key: Buffer.from('aa'), value: Buffer.from('aa') },
+    { key: Buffer.from('ab'), value: Buffer.from('ab') },
+    { key: Buffer.from('ac'), value: Buffer.from('ac') }
   ])
 
   await db.close()
@@ -241,9 +240,9 @@ test('prefix iterator, reverse', async (t) => {
   }
 
   t.alike(entries, [
-    { key: b4a.from('ac'), value: b4a.from('ac') },
-    { key: b4a.from('ab'), value: b4a.from('ab') },
-    { key: b4a.from('aa'), value: b4a.from('aa') }
+    { key: Buffer.from('ac'), value: Buffer.from('ac') },
+    { key: Buffer.from('ab'), value: Buffer.from('ab') },
+    { key: Buffer.from('aa'), value: Buffer.from('aa') }
   ])
 
   await db.close()
@@ -271,7 +270,7 @@ test('prefix iterator, reverse with limit', async (t) => {
     entries.push(entry)
   }
 
-  t.alike(entries, [{ key: b4a.from('ac'), value: b4a.from('ac') }])
+  t.alike(entries, [{ key: Buffer.from('ac'), value: Buffer.from('ac') }])
 
   await db.close()
 })
@@ -331,9 +330,9 @@ test('iterator with snapshot', async (t) => {
   snapshot.destroy()
 
   t.alike(entries, [
-    { key: b4a.from('aa'), value: b4a.from('aa') },
-    { key: b4a.from('ab'), value: b4a.from('ab') },
-    { key: b4a.from('ac'), value: b4a.from('ac') }
+    { key: Buffer.from('aa'), value: Buffer.from('aa') },
+    { key: Buffer.from('ab'), value: Buffer.from('ab') },
+    { key: Buffer.from('ac'), value: Buffer.from('ac') }
   ])
 
   await db.close()
@@ -388,8 +387,8 @@ test('peek', async (t) => {
   batch.destroy()
 
   t.alike(await db.peek({ gte: 'a', lt: 'b' }), {
-    key: b4a.from('aa'),
-    value: b4a.from('aa')
+    key: Buffer.from('aa'),
+    value: Buffer.from('aa')
   })
 
   await db.close()
@@ -407,8 +406,8 @@ test('peek, reverse', async (t) => {
   batch.destroy()
 
   t.alike(await db.peek({ gte: 'a', lt: 'b' }, { reverse: true }), {
-    key: b4a.from('ac'),
-    value: b4a.from('ac')
+    key: Buffer.from('ac'),
+    value: Buffer.from('ac')
   })
 
   await db.close()
@@ -494,9 +493,9 @@ test('idle', async function (t) {
 
     b3.tryFlush()
 
-    t.alike(await node1, b4a.from('world'))
-    t.alike(await node2, b4a.from('value'))
-    t.alike(await node3, b4a.from('entry'))
+    t.alike(await node1, Buffer.from('world'))
+    t.alike(await node2, Buffer.from('value'))
+    t.alike(await node3, Buffer.from('entry'))
 
     b1.destroy()
     b2.destroy()
@@ -545,14 +544,14 @@ test('column families, batch per family', async (t) => {
     const batch = db.read({ columnFamily: a })
     const p = batch.get('key')
     batch.tryFlush()
-    t.alike(await p, b4a.from('a'))
+    t.alike(await p, Buffer.from('a'))
     batch.destroy()
   }
   {
     const batch = db.read({ columnFamily: b })
     const p = batch.get('key')
     batch.tryFlush()
-    t.alike(await p, b4a.from('b'))
+    t.alike(await p, Buffer.from('b'))
     batch.destroy()
   }
 
@@ -579,8 +578,8 @@ test('column families, operation per family', async (t) => {
     const p = batch.get('key', { columnFamily: a })
     const q = batch.get('key', { columnFamily: b })
     batch.tryFlush()
-    t.alike(await p, b4a.from('a'))
-    t.alike(await q, b4a.from('b'))
+    t.alike(await p, Buffer.from('a'))
+    t.alike(await q, Buffer.from('b'))
     batch.destroy()
   }
 
