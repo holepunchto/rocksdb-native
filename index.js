@@ -229,6 +229,7 @@ module.exports = exports = class RocksDB extends ReadyResource {
     const batch = this.read(opts)
     const value = batch.get(key)
     await batch.flush()
+    batch.destroy()
     return value
   }
 
@@ -236,18 +237,21 @@ module.exports = exports = class RocksDB extends ReadyResource {
     const batch = this.write(opts)
     batch.put(key, value)
     await batch.flush()
+    batch.destroy()
   }
 
   async delete(key, opts) {
     const batch = this.write(opts)
     batch.delete(key)
     await batch.flush()
+    batch.destroy()
   }
 
   async deleteRange(start, end, opts) {
     const batch = this.write(opts)
     batch.deleteRange(start, end)
     await batch.flush()
+    batch.destroy()
   }
 }
 
