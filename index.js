@@ -24,11 +24,11 @@ module.exports = exports = class RocksDB extends ReadyResource {
     this._columnFamilies = [defaultColumnFamily, ...columnFamilies]
     this._snapshots = new Set()
     this._refs = 0
-    this._resolvePreclose = null
-    this._resolveOnIdle = null
+    this._onpreclose = null
+    this._onidle = null
     this._suspending = null
     this._resuming = null
-    this._idlePromise = null
+    this._idling = null
 
     this._handle = binding.init(
       Uint32Array.from([
@@ -80,7 +80,7 @@ module.exports = exports = class RocksDB extends ReadyResource {
   async _close() {
     if (this._refs > 0) {
       await new Promise((resolve) => {
-        this._resolvePreclose = resolve
+        this._onpreclose = resolve
       })
     }
 
@@ -115,16 +115,16 @@ module.exports = exports = class RocksDB extends ReadyResource {
   _decRef() {
     if (--this._refs !== 0) return
 
-    if (this._resolveOnIdle !== null) {
-      const resolve = this._resolveOnIdle
-      this._resolveOnIdle = null
-      this._idlePromise = null
+    if (this._onidle !== null) {
+      const resolve = this._onidle
+      this._onidle = null
+      this._idling = null
       resolve()
     }
 
-    if (this._resolvePreclose !== null) {
-      const resolve = this._resolvePreclose
-      this._resolvePreclose = null
+    if (this._onpreclose !== null) {
+      const resolve = this._onpreclose
+      this._onpreclose = null
       resolve()
     }
   }
@@ -192,13 +192,13 @@ module.exports = exports = class RocksDB extends ReadyResource {
   idle() {
     if (this.isIdle()) return Promise.resolve()
 
-    if (!this._idlePromise) {
-      this._idlePromise = new Promise((resolve) => {
-        this._resolveOnIdle = resolve
+    if (!this._idling) {
+      this._idling = new Promise((resolve) => {
+        this._onidle = resolve
       })
     }
 
-    return this._idlePromise
+    return this._idling
   }
 
   snapshot(opts) {
