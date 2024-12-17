@@ -226,32 +226,44 @@ module.exports = exports = class RocksDB extends ReadyResource {
   }
 
   async get(key, opts) {
-    const batch = this.read(opts)
-    const value = batch.get(key)
-    await batch.flush()
-    batch.destroy()
-    return value
+    const batch = this.read({ ...opts, capacity: 1 })
+    try {
+      const value = batch.get(key)
+      batch.tryFlush()
+      return await value
+    } finally {
+      batch.destroy()
+    }
   }
 
   async put(key, value, opts) {
-    const batch = this.write(opts)
-    batch.put(key, value)
-    await batch.flush()
-    batch.destroy()
+    const batch = this.write({ ...opts, capacity: 1 })
+    try {
+      batch.tryPut(key, value)
+      await batch.flush()
+    } finally {
+      batch.destroy()
+    }
   }
 
   async delete(key, opts) {
-    const batch = this.write(opts)
-    batch.delete(key)
-    await batch.flush()
-    batch.destroy()
+    const batch = this.write({ ...opts, capacity: 1 })
+    try {
+      batch.tryDelete(key)
+      await batch.flush()
+    } finally {
+      batch.destroy()
+    }
   }
 
   async deleteRange(start, end, opts) {
-    const batch = this.write(opts)
-    batch.deleteRange(start, end)
-    await batch.flush()
-    batch.destroy()
+    const batch = this.write({ ...opts, capacity: 1 })
+    try {
+      batch.tryDeleteRange(start, end)
+      await batch.flush()
+    } finally {
+      batch.destroy()
+    }
   }
 }
 

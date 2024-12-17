@@ -520,6 +520,27 @@ test('write + read after close', async (t) => {
   t.exception(() => db.write())
 })
 
+test('put + get', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  await db.put('key', 'value')
+  t.alike(await db.get('key'), Buffer.from('value'))
+
+  await db.close()
+})
+
+test('put + delete + get', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  await db.put('key', 'value')
+  await db.delete('key')
+  t.alike(await db.get('key'), null)
+
+  await db.close()
+})
+
 test('column families, batch per family', async (t) => {
   const a = new RocksDB.ColumnFamily('a')
   const b = new RocksDB.ColumnFamily('b')
