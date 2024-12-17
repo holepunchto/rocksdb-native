@@ -549,3 +549,63 @@ test('batch autoDestroy', async (t) => {
   batch.destroy()
   await db.close()
 })
+
+test('column families, batch per family', async (t) => {
+  const a = new RocksDB.ColumnFamily('a')
+  const b = new RocksDB.ColumnFamily('b')
+
+  const db = new RocksDB(await tmp(t), { columnFamilies: [a, b] })
+  await db.ready()
+
+  {
+    const batch = db.write({ columnFamily: a })
+    batch.put('key', 'a')
+    await batch.flush()
+  }
+  {
+    const batch = db.write({ columnFamily: b })
+    batch.put('key', 'b')
+    await batch.flush()
+  }
+
+  {
+    const read = db.read({ columnFamily: a })
+    const p = read.get('key')
+    read.tryFlush()
+    t.alike(await p, b4a.from('a'))
+  }
+  {
+    const read = db.read({ columnFamily: b })
+    const p = read.get('key')
+    read.tryFlush()
+    t.alike(await p, b4a.from('b'))
+  }
+
+  await db.close()
+})
+
+test('column families, operation per family', async (t) => {
+  const a = new RocksDB.ColumnFamily('a')
+  const b = new RocksDB.ColumnFamily('b')
+
+  const db = new RocksDB(await tmp(t), { columnFamilies: [a, b] })
+  await db.ready()
+
+  {
+    const batch = db.write()
+    batch.put('key', 'a', { columnFamily: a })
+    batch.put('key', 'b', { columnFamily: b })
+    await batch.flush()
+  }
+
+  {
+    const read = db.read()
+    const p = read.get('key', { columnFamily: a })
+    const q = read.get('key', { columnFamily: b })
+    read.tryFlush()
+    t.alike(await p, b4a.from('a'))
+    t.alike(await q, b4a.from('b'))
+  }
+
+  await db.close()
+})

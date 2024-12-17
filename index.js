@@ -5,7 +5,7 @@ const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
 const ColumnFamily = require('./lib/column-family')
 
-module.exports = class RocksDB extends ReadyResource {
+module.exports = exports = class RocksDB extends ReadyResource {
   constructor(path, opts = {}) {
     const defaultColumnFamily = new ColumnFamily('default', opts)
 
@@ -250,3 +250,5 @@ module.exports = class RocksDB extends ReadyResource {
     await batch.flush()
   }
 }
+
+exports.ColumnFamily = ColumnFamily
