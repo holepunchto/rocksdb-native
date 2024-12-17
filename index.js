@@ -1,77 +1,54 @@
-/* global Bare */
 const ReadyResource = require('ready-resource')
 const binding = require('./binding')
 const { ReadBatch, WriteBatch } = require('./lib/batch')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
+const ColumnFamily = require('./lib/column-family')
 
 module.exports = class RocksDB extends ReadyResource {
-  constructor(
-    path,
-    {
-      // default options, https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning
+  constructor(path, opts = {}) {
+    const defaultColumnFamily = new ColumnFamily('default', opts)
+
+    const {
+      columnFamilies = [],
       readOnly = false,
       createIfMissing = true,
+      createMissingColumnFamilies = true,
       maxBackgroundJobs = 6,
-      bytesPerSync = 1048576,
-      // blob options, https://github.com/facebook/rocksdb/wiki/BlobDB
-      enableBlobFiles = false,
-      minBlobSize = 0,
-      blobFileSize = 0,
-      enableBlobGarbageCollection = true,
-      // (block) table options
-      tableBlockSize = 16384,
-      tableCacheIndexAndFilterBlocks = true,
-      tableFormatVersion = 4
-    } = {}
-  ) {
+      bytesPerSync = 1048576
+    } = opts
+
     super()
 
-    this.path = path
-
-    this.readOnly = readOnly
-    this.createIfMissing = createIfMissing
-    this.maxBackgroundJobs = maxBackgroundJobs
-    this.bytesPerSync = bytesPerSync
-
-    this.enableBlobFiles = enableBlobFiles
-    this.minBlobSize = minBlobSize
-    this.blobFileSize = blobFileSize
-    this.enableBlobGarbageCollection = enableBlobGarbageCollection
-
-    this.tableBlockSize = tableBlockSize
-    this.tableCacheIndexAndFilterBlocks = tableCacheIndexAndFilterBlocks
-    this.tableFormatVersion = tableFormatVersion
-
+    this._path = path
+    this._columnFamilies = [defaultColumnFamily, ...columnFamilies]
     this._snapshots = new Set()
     this._refs = 0
     this._resolvePreclose = null
     this._resolveOnIdle = null
     this._idlePromise = null
 
-    this._handle = binding.init()
+    this._handle = binding.init(
+      Uint32Array.from([
+        readOnly ? 1 : 0,
+        createIfMissing ? 1 : 0,
+        createMissingColumnFamilies ? 1 : 0,
+        maxBackgroundJobs,
+        bytesPerSync & 0xffffffff,
+        Math.floor(bytesPerSync / 0x100000000)
+      ])
+    )
+  }
+
+  get path() {
+    return this._path
+  }
+
+  get defaultColumnFamily() {
+    return this._columnFamilies[0]
   }
 
   async _open() {
-    const opts = new Uint32Array(16)
-
-    opts[0] = this.readOnly ? 1 : 0
-    opts[1] = this.createIfMissing ? 1 : 0
-    opts[2] = this.maxBackgroundJobs
-    opts[3] = this.bytesPerSync & 0xffffffff
-    opts[4] = Math.floor(this.bytesPerSync / 0x100000000)
-    opts[5] = 0
-    opts[6] = this.enableBlobFiles ? 1 : 0
-    opts[7] = this.minBlobSize & 0xffffffff
-    opts[8] = Math.floor(this.minBlobSize / 0x100000000)
-    opts[9] = this.blobFileSize & 0xffffffff
-    opts[10] = Math.floor(this.blobFileSize / 0x100000000)
-    opts[11] = this.enableBlobGarbageCollection ? 1 : 0
-    opts[12] = this.tableBlockSize & 0xffffffff
-    opts[13] = Math.floor(this.tableBlockSize / 0x100000000)
-    opts[14] = this.tableCacheIndexAndFilterBlocks ? 1 : 0
-    opts[15] = this.tableFormatVersion
-
     const req = { resolve: null, reject: null, handle: null }
 
     const promise = new Promise((resolve, reject) => {
@@ -79,7 +56,14 @@ module.exports = class RocksDB extends ReadyResource {
       req.reject = reject
     })
 
-    req.handle = binding.open(this, this._handle, this.path, opts, req, onopen)
+    req.handle = binding.open(
+      this._handle,
+      this,
+      this._path,
+      this._columnFamilies.map((c) => c._handle),
+      req,
+      onopen
+    )
 
     await promise
 
@@ -98,6 +82,7 @@ module.exports = class RocksDB extends ReadyResource {
       })
     }
 
+    for (const columnFamily of this._columnFamilies) columnFamily.destroy()
     for (const snapshot of this._snapshots) snapshot.destroy()
 
     const req = { resolve: null, reject: null, handle: null }
@@ -168,7 +153,6 @@ module.exports = class RocksDB extends ReadyResource {
 
   async peek(range, opts) {
     for await (const value of this.iterator({ ...range, ...opts, limit: 1 })) {
-      // eslint-disable-line no-unreachable-loop
       return value
     }
 
