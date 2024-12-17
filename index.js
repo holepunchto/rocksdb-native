@@ -104,7 +104,7 @@ module.exports = exports = class RocksDB extends ReadyResource {
     }
   }
 
-  _incRef() {
+  _ref() {
     if (this.closing !== null) {
       throw new Error('Database closed')
     }
@@ -112,7 +112,7 @@ module.exports = exports = class RocksDB extends ReadyResource {
     this._refs++
   }
 
-  _decRef() {
+  _unref() {
     if (--this._refs !== 0) return
 
     if (this._onidle !== null) {
