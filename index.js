@@ -36,11 +36,22 @@ class RocksDB {
     return this._columnFamily
   }
 
-  session({ columnFamily = this._columnFamily } = {}) {
+  session({
+    columnFamily = this._columnFamily,
+    snapshot = this._snapshot !== null
+  } = {}) {
+    let snap = null
+
+    if (snapshot) {
+      snap = this._snapshot
+      if (snap === null) snap = new Snapshot(this._state)
+      else snap.ref()
+    }
+
     return new RocksDB(null, {
       state: this._state,
       columnFamily,
-      snapshot: null
+      snapshot: snap
     })
   }
 
@@ -49,16 +60,7 @@ class RocksDB {
   }
 
   snapshot() {
-    let snapshot = this._snapshot
-
-    if (snapshot === null) snapshot = new Snapshot(this._state)
-    else snapshot.ref()
-
-    return new RocksDB(null, {
-      state: this._state,
-      columnFamily: this._columnFamily,
-      snapshot
-    })
+    return this.session({ snapshot: true })
   }
 
   isRoot() {
