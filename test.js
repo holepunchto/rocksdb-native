@@ -103,13 +103,14 @@ test('read with snapshot', async (t) => {
     await t.execution(p)
   }
   {
-    const batch = db.read({ snapshot })
+    const batch = snapshot.read()
     const p = batch.get('hello')
     await batch.flush()
     batch.destroy()
     t.alike(await p, Buffer.from('world'))
   }
 
+  await snapshot.close()
   await db.close()
 })
 
@@ -320,11 +321,11 @@ test('iterator with snapshot', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { snapshot })) {
+  for await (const entry of snapshot.iterator({ gte: 'a', lt: 'b' })) {
     entries.push(entry)
   }
 
-  snapshot.destroy()
+  await snapshot.close()
 
   t.alike(entries, [
     { key: Buffer.from('aa'), value: Buffer.from('aa') },
@@ -351,11 +352,11 @@ test('iterator with snapshot before db open', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { snapshot })) {
+  for await (const entry of snapshot.iterator({ gte: 'a', lt: 'b' })) {
     entries.push(entry)
   }
 
-  snapshot.destroy()
+  await snapshot.close()
 
   t.alike(entries, [])
 
@@ -366,7 +367,7 @@ test('destroy snapshot before db open', async (t) => {
   const db = new RocksDB(await tmp(t))
 
   const snapshot = db.snapshot()
-  snapshot.destroy()
+  await snapshot.close()
 
   await db.ready()
   await db.close()
@@ -539,67 +540,41 @@ test('put + delete + get', async (t) => {
 })
 
 test('column families, batch per family', async (t) => {
-  const a = new RocksDB.ColumnFamily('a')
-  const b = new RocksDB.ColumnFamily('b')
-
-  const db = new RocksDB(await tmp(t), { columnFamilies: [a, b] })
+  const db = new RocksDB(await tmp(t), { columnFamilies: ['a', 'b'] })
   await db.ready()
 
+  const a = db.session({ columnFamily: 'a' })
+  const b = db.session({ columnFamily: 'b' })
+
   {
-    const batch = db.write({ columnFamily: a })
+    const batch = a.write()
     batch.put('key', 'a')
     await batch.flush()
     batch.destroy()
   }
   {
-    const batch = db.write({ columnFamily: b })
+    const batch = b.write()
     batch.put('key', 'b')
     await batch.flush()
     batch.destroy()
   }
 
   {
-    const batch = db.read({ columnFamily: a })
+    const batch = a.read()
     const p = batch.get('key')
     batch.tryFlush()
     t.alike(await p, Buffer.from('a'))
     batch.destroy()
   }
   {
-    const batch = db.read({ columnFamily: b })
+    const batch = b.read()
     const p = batch.get('key')
     batch.tryFlush()
     t.alike(await p, Buffer.from('b'))
     batch.destroy()
   }
 
-  await db.close()
-})
-
-test('column families, operation per family', async (t) => {
-  const a = new RocksDB.ColumnFamily('a')
-  const b = new RocksDB.ColumnFamily('b')
-
-  const db = new RocksDB(await tmp(t), { columnFamilies: [a, b] })
-  await db.ready()
-
-  {
-    const batch = db.write()
-    batch.put('key', 'a', { columnFamily: a })
-    batch.put('key', 'b', { columnFamily: b })
-    await batch.flush()
-    batch.destroy()
-  }
-
-  {
-    const batch = db.read()
-    const p = batch.get('key', { columnFamily: a })
-    const q = batch.get('key', { columnFamily: b })
-    batch.tryFlush()
-    t.alike(await p, Buffer.from('a'))
-    t.alike(await q, Buffer.from('b'))
-    batch.destroy()
-  }
-
+  await a.close()
+  await b.close()
   await db.close()
 })
