@@ -15,9 +15,7 @@ class RocksDB {
     this._state = state
     this._snapshot = snapshot
     this._columnFamily = state.getColumnFamily(columnFamily)
-    this._destroyed = false
-
-    this._state.refSession()
+    this._index = this._state.addSession(this)
   }
 
   get opened() {
@@ -71,11 +69,17 @@ class RocksDB {
     return this._state.ready()
   }
 
-  close() {
-    if (!this._destroyed) {
-      this._destroyed = true
-      this._state.unrefSession()
+  async close({ force } = {}) {
+    if (this._index !== -1) {
+      this._state.removeSession(this)
+      this._index = -1
       if (this._snapshot) this._snapshot.unref()
+    }
+
+    if (force) {
+      for (let i = this._state.sessions.length - 1; i >= 0; i--) {
+        await this._state.sessions[i].close()
+      }
     }
 
     return this.isRoot() ? this._state.close() : Promise.resolve()
