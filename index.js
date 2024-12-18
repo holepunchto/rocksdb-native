@@ -76,8 +76,7 @@ class RocksDB {
       if (this._snapshot) this._snapshot.unref()
     }
 
-    if (this.isRoot()) return this._state.close()
-    return Promise.resolve()
+    return this.isRoot() ? this._state.close() : Promise.resolve()
   }
 
   suspend() {
