@@ -578,3 +578,18 @@ test('column families, batch per family', async (t) => {
   await b.close()
   await db.close()
 })
+
+test('column families setup implicitly', async (t) => {
+  const db = new RocksDB(await tmp(t))
+
+  const a = db.columnFamily('a')
+  const b = db.columnFamily('b')
+
+  await b.put('hello', 'world')
+  t.is(await a.get('hello'), null)
+  t.alike(await b.get('hello'), Buffer.from('world'))
+
+  await a.close()
+  await b.close()
+  await db.close()
+})

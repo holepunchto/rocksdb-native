@@ -44,6 +44,10 @@ class RocksDB {
     })
   }
 
+  columnFamily (name) {
+    return this.session({ columnFamily: name })
+  }
+
   snapshot() {
     let snapshot = this._snapshot
 
