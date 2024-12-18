@@ -44,7 +44,7 @@ class RocksDB {
     })
   }
 
-  columnFamily (name) {
+  columnFamily(name) {
     return this.session({ columnFamily: name })
   }
 
