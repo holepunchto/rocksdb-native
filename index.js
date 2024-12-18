@@ -25,7 +25,7 @@ class RocksDB {
   }
 
   get closed() {
-    return this._state.closed
+    return this.isRoot() ? this._state.closed : this._destroyed
   }
 
   get path() {
