@@ -38,6 +38,7 @@
   "dependencies": {
     "compact-encoding": "^2.15.0",
     "ready-resource": "^1.0.0",
+    "refcounter": "^1.0.0",
     "require-addon": "^1.0.2",
     "streamx": "^2.16.1"
   },

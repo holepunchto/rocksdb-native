@@ -1,208 +1,104 @@
-const ReadyResource = require('ready-resource')
-const binding = require('./binding')
 const { ReadBatch, WriteBatch } = require('./lib/batch')
+const ColumnFamily = require('./lib/column-family')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
-const ColumnFamily = require('./lib/column-family')
+const DBState = require('./lib/state')
 
-module.exports = exports = class RocksDB extends ReadyResource {
+class RocksDB {
   constructor(path, opts = {}) {
-    const defaultColumnFamily = new ColumnFamily('default', opts)
-
     const {
-      columnFamilies = [],
-      readOnly = false,
-      createIfMissing = true,
-      createMissingColumnFamilies = true,
-      maxBackgroundJobs = 6,
-      bytesPerSync = 1048576
+      columnFamily,
+      state = new DBState(this, path, opts),
+      snapshot = null
     } = opts
 
-    super()
+    this._state = state
+    this._snapshot = snapshot
+    this._columnFamily = state.getColumnFamily(columnFamily)
+    this._index = this._state.addSession(this)
+  }
 
-    this._path = path
-    this._columnFamilies = [defaultColumnFamily, ...columnFamilies]
-    this._snapshots = new Set()
-    this._refs = 0
-    this._onpreclose = null
-    this._onidle = null
-    this._suspending = null
-    this._resuming = null
-    this._idling = null
+  get opened() {
+    return this._state.opened
+  }
 
-    this._handle = binding.init(
-      Uint32Array.from([
-        readOnly ? 1 : 0,
-        createIfMissing ? 1 : 0,
-        createMissingColumnFamilies ? 1 : 0,
-        maxBackgroundJobs,
-        bytesPerSync & 0xffffffff,
-        Math.floor(bytesPerSync / 0x100000000)
-      ])
-    )
+  get closed() {
+    return this.isRoot() ? this._state.closed : this._destroyed
   }
 
   get path() {
-    return this._path
+    return this._state.path
   }
 
   get defaultColumnFamily() {
-    return this._columnFamilies[0]
+    return this._columnFamily
   }
 
-  async _open() {
-    const req = { resolve: null, reject: null, handle: null }
+  session({
+    columnFamily = this._columnFamily,
+    snapshot = this._snapshot !== null
+  } = {}) {
+    let snap = null
 
-    const promise = new Promise((resolve, reject) => {
-      req.resolve = resolve
-      req.reject = reject
+    if (snapshot) {
+      snap = this._snapshot
+      if (snap === null) snap = new Snapshot(this._state)
+      else snap.ref()
+    }
+
+    return new RocksDB(null, {
+      state: this._state,
+      columnFamily,
+      snapshot: snap
     })
-
-    req.handle = binding.open(
-      this._handle,
-      this,
-      this._path,
-      this._columnFamilies.map((c) => c._handle),
-      req,
-      onopen
-    )
-
-    await promise
-
-    for (const snapshot of this._snapshots) snapshot._init()
-
-    function onopen(err) {
-      if (err) req.reject(new Error(err))
-      else req.resolve()
-    }
   }
 
-  async _close() {
-    if (this._refs > 0) {
-      await new Promise((resolve) => {
-        this._onpreclose = resolve
-      })
-    }
-
-    for (const columnFamily of this._columnFamilies) columnFamily.destroy()
-    for (const snapshot of this._snapshots) snapshot.destroy()
-
-    const req = { resolve: null, reject: null, handle: null }
-
-    const promise = new Promise((resolve, reject) => {
-      req.resolve = resolve
-      req.reject = reject
-    })
-
-    req.handle = binding.close(this._handle, req, onclose)
-
-    await promise
-
-    function onclose(err) {
-      if (err) req.reject(new Error(err))
-      else req.resolve()
-    }
+  columnFamily(name) {
+    return this.session({ columnFamily: name })
   }
 
-  _ref() {
-    if (this.closing !== null) {
-      throw new Error('Database closed')
-    }
-
-    this._refs++
+  snapshot() {
+    return this.session({ snapshot: true })
   }
 
-  _unref() {
-    if (--this._refs !== 0) return
-
-    if (this._onidle !== null) {
-      const resolve = this._onidle
-      this._onidle = null
-      this._idling = null
-      resolve()
-    }
-
-    if (this._onpreclose !== null) {
-      const resolve = this._onpreclose
-      this._onpreclose = null
-      resolve()
-    }
+  isRoot() {
+    return this === this._state.db
   }
 
-  async suspend() {
-    if (this.opened === false) await this.ready()
-    if (this._suspending === null) this._suspending = this._suspend()
-    return this._suspending
+  ready() {
+    return this._state.ready()
   }
 
-  async _suspend() {
-    if (this._resuming) await this._resuming
-
-    const req = { resolve: null, reject: null, handle: null }
-
-    const promise = new Promise((resolve, reject) => {
-      req.resolve = resolve
-      req.reject = reject
-    })
-
-    req.handle = binding.suspend(this._handle, req, onsuspend)
-
-    await promise
-
-    this._suspending = null
-
-    function onsuspend(err) {
-      if (err) req.reject(new Error(err))
-      else req.resolve()
+  async close({ force } = {}) {
+    if (this._index !== -1) {
+      this._state.removeSession(this)
+      this._index = -1
+      if (this._snapshot) this._snapshot.unref()
     }
-  }
 
-  async resume() {
-    if (this.opened === false) await this.ready()
-    if (this._resuming === null) this._resuming = this._resume()
-    return this._resuming
-  }
-
-  async _resume() {
-    if (this._suspending) await this._suspending
-
-    const req = { resolve: null, reject: null, handle: null }
-
-    const promise = new Promise((resolve, reject) => {
-      req.resolve = resolve
-      req.reject = reject
-    })
-
-    req.handle = binding.resume(this._handle, req, onresume)
-
-    await promise
-
-    this._resuming = null
-
-    function onresume(err) {
-      if (err) req.reject(new Error(err))
-      else req.resolve()
+    if (force) {
+      for (let i = this._state.sessions.length - 1; i >= 0; i--) {
+        await this._state.sessions[i].close()
+      }
     }
+
+    return this.isRoot() ? this._state.close() : Promise.resolve()
+  }
+
+  suspend() {
+    return this._state.suspend()
+  }
+
+  resume() {
+    return this._state.resume()
   }
 
   isIdle() {
-    return this._refs === 0
+    return this._state.refs.isIdle()
   }
 
   idle() {
-    if (this.isIdle()) return Promise.resolve()
-
-    if (!this._idling) {
-      this._idling = new Promise((resolve) => {
-        this._onidle = resolve
-      })
-    }
-
-    return this._idling
-  }
-
-  snapshot(opts) {
-    return new Snapshot(this, opts)
+    return this._state.refs.idle()
   }
 
   iterator(range, opts) {
@@ -267,4 +163,5 @@ module.exports = exports = class RocksDB extends ReadyResource {
   }
 }
 
+module.exports = exports = RocksDB
 exports.ColumnFamily = ColumnFamily

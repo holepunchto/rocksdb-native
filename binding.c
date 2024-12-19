@@ -4,6 +4,7 @@
 #include <rocksdb.h>
 #include <stdlib.h>
 #include <utf.h>
+#include <string.h>
 
 typedef struct {
   uint32_t low;
