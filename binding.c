@@ -1052,6 +1052,7 @@ rocksdb_native_try_create_external_arraybuffer(js_env_t *env, void *data, size_t
 
   void* cpy;
   err = js_create_arraybuffer(env, len, &cpy, result);
+  if (err != 0) return err;
 
   memcpy(cpy, data, len);
   free(data);
