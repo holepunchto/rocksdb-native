@@ -1043,6 +1043,22 @@ rocksdb_native_iterator_close(js_env_t *env, js_callback_info_t *info) {
   return NULL;
 }
 
+static int
+rocksdb_native_try_create_external_arraybuffer(js_env_t *env, void *data, size_t len, js_value_t **result) {
+  // the external arraybuffer api is optional per (https://nodejs.org/api/n-api.html#napi_create_external_arraybuffer)
+  // so provide a fallback that does a memcpy
+  int err = js_create_external_arraybuffer(env, data, len, rocksdb_native__on_free, NULL, result);
+  if (err == 0) return 0;
+
+  void* cpy;
+  err = js_create_arraybuffer(env, len, &cpy, result);
+
+  memcpy(cpy, data, len);
+  free(data);
+
+  return 0;
+}
+
 static void
 rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
   int err;
@@ -1102,7 +1118,7 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
 
         rocksdb_slice_t *key = &req->keys[i];
 
-        err = js_create_external_arraybuffer(env, (void *) key->data, key->len, rocksdb_native__on_free, NULL, &result);
+        err = rocksdb_native_try_create_external_arraybuffer(env, (void *) key->data, key->len, &result);
         assert(err == 0);
 
         err = js_set_element(env, keys, i, result);
@@ -1110,7 +1126,7 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
 
         rocksdb_slice_t *value = &req->values[i];
 
-        err = js_create_external_arraybuffer(env, (void *) value->data, value->len, rocksdb_native__on_free, NULL, &result);
+        err = rocksdb_native_try_create_external_arraybuffer(env, (void *) value->data, value->len, &result);
         assert(err == 0);
 
         err = js_set_element(env, values, i, result);
@@ -1265,7 +1281,7 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
       } else {
         rocksdb_slice_t *slice = &req->reads[i].value;
 
-        err = js_create_external_arraybuffer(env, (void *) slice->data, slice->len, rocksdb_native__on_free, NULL, &result);
+        err = rocksdb_native_try_create_external_arraybuffer(env, (void *) slice->data, slice->len, &result);
         assert(err == 0);
 
         err = js_set_element(env, values, i, result);
