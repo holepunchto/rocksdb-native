@@ -81,6 +81,18 @@ test('read missing', async (t) => {
   await db.close()
 })
 
+test('read + autoDestroy', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.read({ autoDestroy: true })
+  const p = batch.get('hello')
+  await batch.flush()
+  t.alike(await p, null)
+
+  await db.close()
+})
+
 test('read with snapshot', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
