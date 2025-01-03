@@ -131,7 +131,7 @@ test('delete range', async (t) => {
   await db.ready()
 
   {
-    let batch = db.write()
+    const batch = db.write()
     batch.put('aa', 'aa')
     batch.put('ab', 'ab')
     batch.put('ba', 'ba')
@@ -174,7 +174,7 @@ test('delete range, end does not exist', async (t) => {
   await db.ready()
 
   {
-    let batch = db.write()
+    const batch = db.write()
     batch.put('aa', 'aa')
     batch.put('ab', 'ab')
     batch.put('ac', 'ac')
@@ -317,7 +317,7 @@ test('iterator with snapshot', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  let batch = db.write()
+  const batch = db.write()
   batch.put('aa', 'aa')
   batch.put('ab', 'ab')
   batch.put('ac', 'ac')
@@ -428,7 +428,7 @@ test('delete', async (t) => {
   await db.ready()
 
   {
-    let batch = db.write()
+    const batch = db.write()
     batch.put('hello', 'world')
     batch.put('next', 'value')
     batch.put('another', 'entry')
