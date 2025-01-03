@@ -1,4 +1,3 @@
-const { ReadBatch, WriteBatch } = require('./lib/batch')
 const ColumnFamily = require('./lib/column-family')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
@@ -114,52 +113,36 @@ class RocksDB {
   }
 
   read(opts) {
-    return new ReadBatch(this, opts)
+    return this._state.createReadBatch(this, opts)
   }
 
   write(opts) {
-    return new WriteBatch(this, opts)
+    return this._state.createWriteBatch(this, opts)
   }
 
   async get(key, opts) {
-    const batch = this.read({ ...opts, capacity: 1 })
-    try {
-      const value = batch.get(key)
-      batch.tryFlush()
-      return await value
-    } finally {
-      batch.destroy()
-    }
+    const batch = this.read({ ...opts, capacity: 1, autoDestroy: true })
+    const value = batch.get(key)
+    batch.tryFlush()
+    return value
   }
 
   async put(key, value, opts) {
-    const batch = this.write({ ...opts, capacity: 1 })
-    try {
-      batch.tryPut(key, value)
-      await batch.flush()
-    } finally {
-      batch.destroy()
-    }
+    const batch = this.write({ ...opts, capacity: 1, autoDestroy: true })
+    batch.tryPut(key, value)
+    await batch.flush()
   }
 
   async delete(key, opts) {
-    const batch = this.write({ ...opts, capacity: 1 })
-    try {
-      batch.tryDelete(key)
-      await batch.flush()
-    } finally {
-      batch.destroy()
-    }
+    const batch = this.write({ ...opts, capacity: 1, autoDestroy: true })
+    batch.tryDelete(key)
+    await batch.flush()
   }
 
   async deleteRange(start, end, opts) {
-    const batch = this.write({ ...opts, capacity: 1 })
-    try {
-      batch.tryDeleteRange(start, end)
-      await batch.flush()
-    } finally {
-      batch.destroy()
-    }
+    const batch = this.write({ ...opts, capacity: 1, autoDestroy: true })
+    batch.tryDeleteRange(start, end)
+    await batch.flush()
   }
 }
 
