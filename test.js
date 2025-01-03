@@ -312,7 +312,8 @@ test('iterator with encoding', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
 
-  const batch = db.write({ encoding: c.string })
+  const session = db.session({ keyEncoding: c.string, valueEncoding: c.string })
+  const batch = session.write()
   batch.put('a', 'hello')
   batch.put('b', 'world')
   batch.put('c', '!')
@@ -321,10 +322,7 @@ test('iterator with encoding', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator(
-    { gte: 'a', lt: 'c' },
-    { encoding: c.string }
-  )) {
+  for await (const entry of session.iterator({ gte: 'a', lt: 'c' })) {
     entries.push(entry)
   }
 
@@ -333,6 +331,7 @@ test('iterator with encoding', async (t) => {
     { key: 'b', value: 'world' }
   ])
 
+  await session.close()
   await db.close()
 })
 

@@ -8,12 +8,16 @@ class RocksDB {
     const {
       columnFamily,
       state = new DBState(this, path, opts),
-      snapshot = null
+      snapshot = null,
+      keyEncoding = null,
+      valueEncoding = null
     } = opts
 
     this._state = state
     this._snapshot = snapshot
     this._columnFamily = state.getColumnFamily(columnFamily)
+    this._keyEncoding = keyEncoding
+    this._valueEncoding = valueEncoding
     this._index = this._state.addSession(this)
   }
 
@@ -35,7 +39,9 @@ class RocksDB {
 
   session({
     columnFamily = this._columnFamily,
-    snapshot = this._snapshot !== null
+    snapshot = this._snapshot !== null,
+    keyEncoding = this._keyEncoding,
+    valueEncoding = this._valueEncoding
   } = {}) {
     let snap = null
 
@@ -48,12 +54,14 @@ class RocksDB {
     return new RocksDB(null, {
       state: this._state,
       columnFamily,
-      snapshot: snap
+      snapshot: snap,
+      keyEncoding,
+      valueEncoding
     })
   }
 
-  columnFamily(name) {
-    return this.session({ columnFamily: name })
+  columnFamily(name, opts) {
+    return this.session({ ...opts, columnFamily: name })
   }
 
   snapshot() {
