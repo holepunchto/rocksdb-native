@@ -31,6 +31,29 @@ test('write + read', async (t) => {
   await db.close()
 })
 
+test('write + read multiple batches', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  {
+    const batch = db.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    batch.destroy()
+    await t.execution(p)
+  }
+
+  for (let i = 0; i < 50; i++) {
+    const batch = db.read()
+    const p = batch.get('hello')
+    await batch.flush()
+    batch.destroy()
+    t.alike(await p, Buffer.from('world'))
+  }
+
+  await db.close()
+})
+
 test('write + read multiple', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
