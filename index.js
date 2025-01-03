@@ -1,4 +1,3 @@
-const { ReadBatch, WriteBatch } = require('./lib/batch')
 const ColumnFamily = require('./lib/column-family')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
@@ -114,11 +113,11 @@ class RocksDB {
   }
 
   read(opts) {
-    return new ReadBatch(this, opts)
+    return this._state.createReadBatch(this, opts)
   }
 
   write(opts) {
-    return new WriteBatch(this, opts)
+    return this._state.createWriteBatch(this, opts)
   }
 
   async get(key, opts) {
