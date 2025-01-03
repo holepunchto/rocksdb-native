@@ -322,9 +322,7 @@ test('iterator with encoding', async (t) => {
 
   const entries = []
 
-  for await (const entry of session.iterator(
-    { gte: 'a', lt: 'c' }
-  )) {
+  for await (const entry of session.iterator({ gte: 'a', lt: 'c' })) {
     entries.push(entry)
   }
 
