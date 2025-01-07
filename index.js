@@ -18,7 +18,9 @@ class RocksDB {
     this._columnFamily = state.getColumnFamily(columnFamily)
     this._keyEncoding = keyEncoding
     this._valueEncoding = valueEncoding
-    this._index = this._state.addSession(this)
+    this._index = -1
+
+    this._state.addSession(this)
   }
 
   get opened() {
@@ -43,18 +45,12 @@ class RocksDB {
     keyEncoding = this._keyEncoding,
     valueEncoding = this._valueEncoding
   } = {}) {
-    let snap = null
-
-    if (snapshot) {
-      snap = this._snapshot
-      if (snap === null) snap = new Snapshot(this._state)
-      else snap.ref()
-    }
+    maybeClosed(this)
 
     return new RocksDB(null, {
       state: this._state,
       columnFamily,
-      snapshot: snap,
+      snapshot: snapshot ? this._snapshot || new Snapshot(this._state) : null,
       keyEncoding,
       valueEncoding
     })
@@ -77,11 +73,7 @@ class RocksDB {
   }
 
   async close({ force } = {}) {
-    if (this._index !== -1) {
-      this._state.removeSession(this)
-      this._index = -1
-      if (this._snapshot) this._snapshot.unref()
-    }
+    if (this._index !== -1) this._state.removeSession(this)
 
     if (force) {
       for (let i = this._state.sessions.length - 1; i >= 0; i--) {
@@ -93,22 +85,28 @@ class RocksDB {
   }
 
   suspend() {
+    maybeClosed(this)
+
     return this._state.suspend()
   }
 
   resume() {
+    maybeClosed(this)
+
     return this._state.resume()
   }
 
   isIdle() {
-    return this._state.refs.isIdle()
+    return this._state.activity.isIdle()
   }
 
   idle() {
-    return this._state.refs.idle()
+    return this._state.activity.idle()
   }
 
   iterator(range, opts) {
+    maybeClosed(this)
+
     return new Iterator(this, { ...range, ...opts })
   }
 
@@ -121,10 +119,14 @@ class RocksDB {
   }
 
   read(opts) {
+    maybeClosed(this)
+
     return this._state.createReadBatch(this, opts)
   }
 
   write(opts) {
+    maybeClosed(this)
+
     return this._state.createWriteBatch(this, opts)
   }
 
@@ -152,7 +154,24 @@ class RocksDB {
     batch.tryDeleteRange(start, end)
     await batch.flush()
   }
+
+  // used by iterators/batches to ensure no gc/close when active
+
+  _ref() {
+    if (this._snapshot) this._snapshot.ref()
+    this._state.activity.inc()
+  }
+
+  _unref() {
+    if (this._snapshot) this._snapshot.unref()
+    this._state.activity.dec()
+  }
 }
 
 module.exports = exports = RocksDB
 exports.ColumnFamily = ColumnFamily
+
+function maybeClosed(db) {
+  if (db._state.closing || db._destroyed)
+    throw new Error('RocksDB session is closed')
+}
