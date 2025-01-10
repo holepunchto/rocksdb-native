@@ -35,6 +35,10 @@ class RocksDB {
     return this._state.path
   }
 
+  get snapshotted() {
+    return this._snapshot !== null
+  }
+
   get defaultColumnFamily() {
     return this._columnFamily
   }
