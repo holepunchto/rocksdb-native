@@ -552,6 +552,24 @@ test('write + read after close', async (t) => {
   t.exception(() => db.write())
 })
 
+test('session reuse after close', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const session = db.session()
+  const read = session.read({ autoDestroy: true })
+
+  read.get(0)
+  read.tryFlush()
+
+  await session.close()
+
+  t.exception(() => session.read())
+  t.exception(() => session.write())
+
+  await t.execution(db.close())
+})
+
 test('put + get', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
