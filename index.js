@@ -176,6 +176,6 @@ module.exports = exports = RocksDB
 exports.ColumnFamily = ColumnFamily
 
 function maybeClosed(db) {
-  if (db._state.closing || db._destroyed)
+  if (db._state.closing || db._index === -1)
     throw new Error('RocksDB session is closed')
 }
