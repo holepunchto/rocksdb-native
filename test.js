@@ -559,7 +559,7 @@ test('session reuse after close', async (t) => {
   const session = db.session()
   const read = session.read({ autoDestroy: true })
 
-  read.get(0)
+  read.get('key')
   read.tryFlush()
 
   await session.close()
