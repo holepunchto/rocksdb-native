@@ -19,6 +19,7 @@ class RocksDB {
     this._keyEncoding = keyEncoding
     this._valueEncoding = valueEncoding
     this._index = -1
+    this._destroyed = false
 
     this._state.addSession(this)
   }
@@ -77,6 +78,8 @@ class RocksDB {
   }
 
   async close({ force } = {}) {
+    this._destroyed = true
+
     if (this._index !== -1) this._state.removeSession(this)
 
     if (force) {
