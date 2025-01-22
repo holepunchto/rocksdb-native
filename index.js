@@ -28,7 +28,7 @@ class RocksDB {
   }
 
   get closed() {
-    return this.isRoot() ? this._state.closed : this._destroyed
+    return this.isRoot() ? this._state.closed : this._index === -1
   }
 
   get path() {
@@ -176,6 +176,6 @@ module.exports = exports = RocksDB
 exports.ColumnFamily = ColumnFamily
 
 function maybeClosed(db) {
-  if (db._state.closing || db._destroyed)
+  if (db._state.closing || db._index === -1)
     throw new Error('RocksDB session is closed')
 }
