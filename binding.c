@@ -3,8 +3,8 @@
 #include <js.h>
 #include <rocksdb.h>
 #include <stdlib.h>
-#include <utf.h>
 #include <string.h>
+#include <utf.h>
 
 typedef struct {
   uint32_t low;
@@ -1050,7 +1050,7 @@ rocksdb_native_try_create_external_arraybuffer(js_env_t *env, void *data, size_t
   int err = js_create_external_arraybuffer(env, data, len, rocksdb_native__on_free, NULL, result);
   if (err == 0) return 0;
 
-  void* cpy;
+  void *cpy;
   err = js_create_arraybuffer(env, len, &cpy, result);
   if (err != 0) return err;
 
@@ -1282,8 +1282,13 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
       } else {
         rocksdb_slice_t *slice = &req->reads[i].value;
 
-        err = rocksdb_native_try_create_external_arraybuffer(env, (void *) slice->data, slice->len, &result);
-        assert(err == 0);
+        if (slice->data == NULL && slice->len == (size_t) -1) {
+          err = js_get_null(env, &result);
+          assert(err == 0);
+        } else {
+          err = rocksdb_native_try_create_external_arraybuffer(env, (void *) slice->data, slice->len, &result);
+          assert(err == 0);
+        }
 
         err = js_set_element(env, values, i, result);
         assert(err == 0);
