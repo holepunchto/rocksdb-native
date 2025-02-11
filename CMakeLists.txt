@@ -7,6 +7,12 @@ find_package(cmake-npm REQUIRED PATHS node_modules/cmake-npm)
 
 project(rocksdb_native C CXX)
 
+bare_target(target)
+
+if(target MATCHES "win32")
+  add_compile_options(/MT$<$<CONFIG:Debug>:d>)
+endif()
+
 fetch_package("github:holepunchto/librocksdb#fb2c47a")
 
 add_bare_module(rocksdb_native_bare)
