@@ -254,14 +254,14 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
   js_deferred_teardown_t *teardown = db->teardown;
 
   if (db->exiting) {
+    err = js_delete_reference(env, db->ctx);
+    assert(err == 0);
+
     if (db->closing) {
       err = js_delete_reference(env, req->on_close);
       assert(err == 0);
 
       err = js_delete_reference(env, req->ctx);
-      assert(err == 0);
-
-      err = js_delete_reference(env, db->ctx);
       assert(err == 0);
     } else {
       free(req);
@@ -279,13 +279,13 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
     err = js_get_reference_value(env, req->on_close, &cb);
     assert(err == 0);
 
+    err = js_delete_reference(env, db->ctx);
+    assert(err == 0);
+
     err = js_delete_reference(env, req->on_close);
     assert(err == 0);
 
     err = js_delete_reference(env, req->ctx);
-    assert(err == 0);
-
-    err = js_delete_reference(env, db->ctx);
     assert(err == 0);
 
     js_call_function_with_checkpoint(env, ctx, cb, 0, NULL, NULL);
