@@ -172,6 +172,7 @@ class RocksDB {
 }
 
 module.exports = exports = RocksDB
+
 exports.ColumnFamily = ColumnFamily
 
 function maybeClosed(db) {
