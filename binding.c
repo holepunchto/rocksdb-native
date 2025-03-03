@@ -312,6 +312,7 @@ rocksdb_native__on_teardown(js_deferred_teardown_t *handle, void *data) {
 
   rocksdb_native_close_t *req = malloc(sizeof(rocksdb_native_close_t));
 
+  req->env = env;
   req->handle.data = (void *) req;
 
   err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_close);
