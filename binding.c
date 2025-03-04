@@ -28,6 +28,8 @@ typedef struct {
   rocksdb_native_uint64_t table_block_size;
   uint32_t table_cache_index_and_filter_blocks;
   uint32_t table_format_version;
+  uint32_t optimize_filters_for_memory;
+  uint32_t no_block_cache;
 } rocksdb_native_column_family_options_t;
 
 typedef struct {
@@ -719,7 +721,7 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
     (const char *) name,
     {
-      0,
+      1,
       options->compation_style,
       options->enable_blob_files,
       rocksdb_native__to_uint64(options->min_blob_size),
@@ -728,6 +730,8 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
       rocksdb_native__to_uint64(options->table_block_size),
       options->table_cache_index_and_filter_blocks,
       options->table_format_version,
+      options->optimize_filters_for_memory,
+      options->no_block_cache,
     }
   };
 
