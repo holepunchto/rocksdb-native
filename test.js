@@ -645,3 +645,51 @@ test('column families setup implicitly', async (t) => {
   await b.close()
   await db.close()
 })
+
+test('read-only', async (t) => {
+  const dir = await tmp(t)
+
+  const w = new RocksDB(dir)
+  await w.ready()
+
+  {
+    const batch = w.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    batch.destroy()
+    await t.execution(p)
+  }
+
+  const r = new RocksDB(dir, { readOnly: true })
+  await r.ready()
+
+  {
+    const batch = r.read()
+    const p = batch.get('hello')
+    await batch.flush()
+    batch.destroy()
+    t.alike(await p, Buffer.from('world'))
+  }
+
+  await w.close()
+  await r.close()
+})
+
+test('read-only + write', async (t) => {
+  const dir = await tmp(t)
+
+  const w = new RocksDB(dir)
+  await w.ready()
+
+  const r = new RocksDB(dir, { readOnly: true })
+  await r.ready()
+
+  const batch = r.write()
+  const p = batch.put('hello', 'world')
+  await t.exception(batch.flush(), /Batch was not applied/)
+  batch.destroy()
+  await t.exception(p, /Not supported operation in read only mode/)
+
+  await w.close()
+  await r.close()
+})
