@@ -693,3 +693,65 @@ test('read-only + write', async (t) => {
   await w.close()
   await r.close()
 })
+
+test('suspend + resume', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+  await db.suspend()
+  await db.resume()
+  await db.close()
+})
+
+test('suspend + close without resume', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+  await db.suspend()
+  await db.close()
+})
+
+test('suspend + read', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+  await db.suspend()
+
+  const batch = db.read()
+  const p = batch.get('hello')
+  await t.exception(batch.flush(), /Database is suspended/)
+  batch.destroy()
+  await t.exception(p, /Batch is destroyed/)
+
+  await db.close()
+})
+
+test('suspend + write', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+  await db.suspend()
+
+  const batch = db.write()
+  const p = batch.put('hello', 'world')
+  await t.exception(batch.flush(), /Database is suspended/)
+  batch.destroy()
+  await t.exception(p, /Batch is destroyed/)
+
+  await db.close()
+})
+
+test('suspend + open new writer', async (t) => {
+  const dir = await tmp(t)
+
+  const w1 = new RocksDB(dir)
+  await w1.ready()
+  await w1.suspend()
+
+  const w2 = new RocksDB(dir)
+  await w2.ready()
+
+  await t.exception(w1.resume())
+
+  await w2.close()
+
+  await t.execution(w1.resume())
+
+  await w1.close()
+})
