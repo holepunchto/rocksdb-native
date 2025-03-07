@@ -13,7 +13,7 @@ if(target MATCHES "win32")
   add_compile_options(/MT$<$<CONFIG:Debug>:d>)
 endif()
 
-fetch_package("github:holepunchto/librocksdb#2adf4ff")
+fetch_package("github:holepunchto/librocksdb#db4b42a")
 
 add_bare_module(rocksdb_native_bare)
 
