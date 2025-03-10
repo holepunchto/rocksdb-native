@@ -317,6 +317,8 @@ rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
   V(create_missing_column_families, bool)
   V(max_background_jobs, int32)
   V(bytes_per_sync, int64)
+  V(max_open_files, int32)
+  V(use_direct_reads, bool)
 #undef V
 
   uv_loop_t *loop;
@@ -334,12 +336,14 @@ rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
   db->exiting = false;
 
   db->options = (rocksdb_options_t) {
-    0,
+    1,
     read_only,
     create_if_missing,
     create_missing_column_families,
     max_background_jobs,
     bytes_per_sync,
+    max_open_files,
+    use_direct_reads
   };
 
   err = rocksdb_init(loop, &db->handle);
@@ -749,7 +753,7 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
     (const char *) name,
     {
-      1,
+      2,
       rocksdb_level_compaction,
       enable_blob_files,
       min_blob_size,
