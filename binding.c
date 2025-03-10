@@ -304,16 +304,19 @@ rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
 
   typedef bool bool_t;
 
-#define V(i, name, type) \
+#define V(name, type) \
+  assert(i < argc); \
   type##_t name; \
-  err = js_get_value_##type(env, argv[i], &name); \
+  err = js_get_value_##type(env, argv[i++], &name); \
   assert(err == 0);
 
-  V(0, read_only, bool)
-  V(1, create_if_missing, bool)
-  V(2, create_missing_column_families, bool)
-  V(3, max_background_jobs, int32)
-  V(4, bytes_per_sync, int64)
+  int i = 0;
+
+  V(read_only, bool)
+  V(create_if_missing, bool)
+  V(create_missing_column_families, bool)
+  V(max_background_jobs, int32)
+  V(bytes_per_sync, int64)
 #undef V
 
   uv_loop_t *loop;
@@ -661,13 +664,13 @@ static js_value_t *
 rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 10;
-  js_value_t *argv[10];
+  size_t argc = 13;
+  js_value_t *argv[13];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 10);
+  assert(argc >= 11 && argc <= 13);
 
   size_t name_len;
   err = js_get_value_string_utf8(env, argv[0], NULL, 0, &name_len);
@@ -680,21 +683,56 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
 
   typedef bool bool_t;
+  typedef double double_t;
 
-#define V(i, name, type) \
+#define V(name, type) \
+  assert(i < argc); \
   type##_t name; \
-  err = js_get_value_##type(env, argv[i], &name); \
+  err = js_get_value_##type(env, argv[i++], &name); \
   assert(err == 0);
 
-  V(1, enable_blob_files, bool)
-  V(2, min_blob_size, int64)
-  V(3, blob_file_size, int64)
-  V(4, enable_blob_garbage_collection, bool)
-  V(5, table_block_size, int64)
-  V(6, table_cache_index_and_filter_blocks, bool)
-  V(7, table_format_version, uint32)
-  V(8, optimize_filters_for_memory, bool)
-  V(9, no_block_cache, bool)
+  int i = 1;
+
+  V(enable_blob_files, bool)
+  V(min_blob_size, int64)
+  V(blob_file_size, int64)
+  V(enable_blob_garbage_collection, bool)
+  V(table_block_size, int64)
+  V(table_cache_index_and_filter_blocks, bool)
+  V(table_format_version, uint32)
+  V(optimize_filters_for_memory, bool)
+  V(no_block_cache, bool)
+
+  rocksdb_filter_policy_t filter_policy;
+
+  V(filter_policy_type, uint32)
+
+  filter_policy.type = filter_policy_type;
+
+  switch (filter_policy_type) {
+  case rocksdb_bloom_filter_policy: {
+    V(bits_per_key, double)
+
+    filter_policy.bloom = (rocksdb_bloom_filter_options_t) {
+      0,
+      bits_per_key
+    };
+
+    break;
+  }
+  case rocksdb_ribbon_filter_policy: {
+    V(bloom_equivalent_bits_per_key, double)
+    V(bloom_before_level, int32)
+
+    filter_policy.ribbon = (rocksdb_ribbon_filter_options_t) {
+      0,
+      bloom_equivalent_bits_per_key,
+      bloom_before_level,
+    };
+
+    break;
+  }
+  }
 #undef V
 
   uv_loop_t *loop;
@@ -725,6 +763,7 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
       table_format_version,
       optimize_filters_for_memory,
       no_block_cache,
+      filter_policy,
     }
   };
 

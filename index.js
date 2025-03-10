@@ -1,13 +1,14 @@
 const ColumnFamily = require('./lib/column-family')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
-const DBState = require('./lib/state')
+const State = require('./lib/state')
+const { BloomFilterPolicy, RibbonFilterPolicy } = require('./lib/filter-policy')
 
 class RocksDB {
   constructor(path, opts = {}) {
     const {
       columnFamily,
-      state = new DBState(this, path, opts),
+      state = new State(this, path, opts),
       snapshot = null,
       keyEncoding = null,
       valueEncoding = null
@@ -174,6 +175,8 @@ class RocksDB {
 module.exports = exports = RocksDB
 
 exports.ColumnFamily = ColumnFamily
+exports.BloomFilterPolicy = BloomFilterPolicy
+exports.RibbonFilterPolicy = RibbonFilterPolicy
 
 function maybeClosed(db) {
   if (db._state.closing || db._index === -1)
