@@ -7,32 +7,6 @@
 #include <utf.h>
 
 typedef struct {
-  uint32_t low;
-  uint32_t high;
-} rocksdb_native_uint64_t;
-
-typedef struct {
-  uint32_t read_only;
-  uint32_t create_if_missing;
-  uint32_t create_missing_column_families;
-  uint32_t max_background_jobs;
-  rocksdb_native_uint64_t bytes_per_sync;
-} rocksdb_native_options_t;
-
-typedef struct {
-  uint32_t compation_style;
-  uint32_t enable_blob_files;
-  rocksdb_native_uint64_t min_blob_size;
-  rocksdb_native_uint64_t blob_file_size;
-  uint32_t enable_blob_garbage_collection;
-  rocksdb_native_uint64_t table_block_size;
-  uint32_t table_cache_index_and_filter_blocks;
-  uint32_t table_format_version;
-  uint32_t optimize_filters_for_memory;
-  uint32_t no_block_cache;
-} rocksdb_native_column_family_options_t;
-
-typedef struct {
   rocksdb_column_family_t *handle;
   rocksdb_column_family_descriptor_t descriptor;
 
@@ -136,11 +110,6 @@ typedef struct {
 typedef struct {
   rocksdb_snapshot_t handle;
 } rocksdb_native_snapshot_t;
-
-static inline uint64_t
-rocksdb_native__to_uint64(rocksdb_native_uint64_t n) {
-  return n.high * 0x100000000 + n.low;
-}
 
 static void
 rocksdb_native__on_free(js_env_t *env, void *data, void *finalize_hint) {
@@ -325,17 +294,27 @@ static js_value_t *
 rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 1;
-  js_value_t *argv[1];
+  size_t argc = 7;
+  js_value_t *argv[7];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 1);
+  assert(argc == 7);
 
-  rocksdb_native_options_t *options;
-  err = js_get_typedarray_info(env, argv[0], NULL, (void **) &options, NULL, NULL, NULL);
+  typedef bool bool_t;
+
+#define V(i, name, type) \
+  type##_t name; \
+  err = js_get_value_##type(env, argv[i], &name); \
   assert(err == 0);
+
+  V(0, read_only, bool)
+  V(1, create_if_missing, bool)
+  V(2, create_missing_column_families, bool)
+  V(3, max_background_jobs, int32)
+  V(4, bytes_per_sync, int64)
+#undef V
 
   uv_loop_t *loop;
   err = js_get_env_loop(env, &loop);
@@ -353,11 +332,11 @@ rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
 
   db->options = (rocksdb_options_t) {
     0,
-    options->read_only,
-    options->create_if_missing,
-    options->create_missing_column_families,
-    options->max_background_jobs,
-    rocksdb_native__to_uint64(options->bytes_per_sync),
+    read_only,
+    create_if_missing,
+    create_missing_column_families,
+    max_background_jobs,
+    bytes_per_sync,
   };
 
   err = rocksdb_init(loop, &db->handle);
@@ -682,13 +661,13 @@ static js_value_t *
 rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 2;
-  js_value_t *argv[2];
+  size_t argc = 10;
+  js_value_t *argv[10];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 2);
+  assert(argc == 10);
 
   size_t name_len;
   err = js_get_value_string_utf8(env, argv[0], NULL, 0, &name_len);
@@ -700,9 +679,23 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   err = js_get_value_string_utf8(env, argv[0], name, name_len, NULL);
   assert(err == 0);
 
-  rocksdb_native_column_family_options_t *options;
-  err = js_get_typedarray_info(env, argv[1], NULL, (void **) &options, NULL, NULL, NULL);
+  typedef bool bool_t;
+
+#define V(i, name, type) \
+  type##_t name; \
+  err = js_get_value_##type(env, argv[i], &name); \
   assert(err == 0);
+
+  V(1, enable_blob_files, bool)
+  V(2, min_blob_size, int64)
+  V(3, blob_file_size, int64)
+  V(4, enable_blob_garbage_collection, bool)
+  V(5, table_block_size, int64)
+  V(6, table_cache_index_and_filter_blocks, bool)
+  V(7, table_format_version, uint32)
+  V(8, optimize_filters_for_memory, bool)
+  V(9, no_block_cache, bool)
+#undef V
 
   uv_loop_t *loop;
   err = js_get_env_loop(env, &loop);
@@ -722,16 +715,16 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
     (const char *) name,
     {
       1,
-      options->compation_style,
-      options->enable_blob_files,
-      rocksdb_native__to_uint64(options->min_blob_size),
-      rocksdb_native__to_uint64(options->blob_file_size),
-      options->enable_blob_garbage_collection,
-      rocksdb_native__to_uint64(options->table_block_size),
-      options->table_cache_index_and_filter_blocks,
-      options->table_format_version,
-      options->optimize_filters_for_memory,
-      options->no_block_cache,
+      rocksdb_level_compaction,
+      enable_blob_files,
+      min_blob_size,
+      blob_file_size,
+      enable_blob_garbage_collection,
+      table_block_size,
+      table_cache_index_and_filter_blocks,
+      table_format_version,
+      optimize_filters_for_memory,
+      no_block_cache,
     }
   };
 
