@@ -702,12 +702,9 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   V(table_format_version, uint32)
   V(optimize_filters_for_memory, bool)
   V(no_block_cache, bool)
-
-  rocksdb_filter_policy_t filter_policy;
-
   V(filter_policy_type, uint32)
 
-  filter_policy.type = filter_policy_type;
+  rocksdb_filter_policy_t filter_policy = {filter_policy_type};
 
   switch (filter_policy_type) {
   case rocksdb_bloom_filter_policy: {
