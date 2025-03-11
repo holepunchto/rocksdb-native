@@ -43,7 +43,7 @@
     "streamx": "^2.16.1"
   },
   "devDependencies": {
-    "bare-compat-napi": "^1.1.0",
+    "bare-compat-napi": "^1.3.0",
     "brittle": "^3.5.0",
     "cmake-bare": "^1.1.14",
     "cmake-fetch": "^1.0.1",
