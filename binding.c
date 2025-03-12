@@ -1751,7 +1751,7 @@ rocksdb_native_flush(js_env_t *env, js_callback_info_t *info) {
   js_value_t *handle;
 
   rocksdb_native_flush_t *req;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_resume_t), (void **) &req, &handle);
+  err = js_create_arraybuffer(env, sizeof(rocksdb_native_flush_t), (void **) &req, &handle);
   assert(err == 0);
 
   req->env = env;

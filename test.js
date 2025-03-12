@@ -104,6 +104,7 @@ test('write + flush', async (t) => {
   await db.flush()
   await db.close()
 })
+
 test('read missing', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
