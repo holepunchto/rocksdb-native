@@ -134,6 +134,12 @@ class RocksDB {
     return this._state.createWriteBatch(this, opts)
   }
 
+  flush(opts) {
+    maybeClosed(this)
+
+    return this._state.flush(this, opts)
+  }
+
   async get(key, opts) {
     const batch = this.read({ ...opts, capacity: 1, autoDestroy: true })
     const value = batch.get(key)
