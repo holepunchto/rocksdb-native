@@ -91,6 +91,20 @@ test('write + read multiple', async (t) => {
   await db.close()
 })
 
+test('write + flush', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+
+  const batch = db.write()
+  const p = batch.put('hello', 'world')
+  await batch.flush()
+  batch.destroy()
+  await t.execution(p)
+
+  await db.flush()
+  await db.close()
+})
+
 test('read missing', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
