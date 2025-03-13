@@ -33,7 +33,7 @@
   },
   "homepage": "https://github.com/holepunchto/rocksdb-native",
   "engines": {
-    "bare": ">=1.7.0"
+    "bare": ">=1.16.0"
   },
   "dependencies": {
     "compact-encoding": "^2.15.0",
