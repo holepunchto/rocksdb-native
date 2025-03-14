@@ -190,10 +190,15 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
       err = js_get_array_length(env, column_families, &len);
       assert(err == 0);
 
+      js_value_t **elements = malloc(len * sizeof(js_value_t *));
+
+      uint32_t fetched;
+      err = js_get_array_elements(env, column_families, elements, len, 0, &fetched);
+      assert(err == 0);
+      assert(fetched == len);
+
       for (uint32_t i = 0; i < len; i++) {
-        js_value_t *handle;
-        err = js_get_element(env, column_families, i, &handle);
-        assert(err == 0);
+        js_value_t *handle = elements[i];
 
         rocksdb_native_column_family_t *column_family;
         err = js_get_arraybuffer_info(env, handle, (void **) &column_family, NULL);
@@ -207,6 +212,8 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
         err = js_add_teardown_callback(env, rocksdb_native__on_column_family_teardown, (void *) column_family);
         assert(err == 0);
       }
+
+      free(elements);
     }
 
     js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
@@ -388,10 +395,15 @@ rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
 
   rocksdb_column_family_descriptor_t *column_families = calloc(len, sizeof(rocksdb_column_family_descriptor_t));
 
+  js_value_t **elements = malloc(len * sizeof(js_value_t *));
+
+  uint32_t fetched;
+  err = js_get_array_elements(env, argv[3], elements, len, 0, &fetched);
+  assert(err == 0);
+  assert(fetched == len);
+
   for (uint32_t i = 0; i < len; i++) {
-    js_value_t *handle;
-    err = js_get_element(env, argv[3], i, &handle);
-    assert(err == 0);
+    js_value_t *handle = elements[i];
 
     rocksdb_native_column_family_t *column_family;
     err = js_get_arraybuffer_info(env, handle, (void **) &column_family, NULL);
@@ -401,6 +413,8 @@ rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
 
     column_family->db = &db->handle;
   }
+
+  free(elements);
 
   rocksdb_column_family_t **handles = calloc(len, sizeof(rocksdb_column_family_t *));
 
@@ -1394,10 +1408,16 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
   err = js_create_reference(env, argv[5], 1, &req->on_status);
   assert(err == 0);
 
+  js_value_t **elements = malloc(len * sizeof(js_value_t *));
+
+  uint32_t fetched;
+  err = js_get_array_elements(env, argv[2], elements, len, 0, &fetched);
+  assert(err == 0);
+  assert(fetched == len);
+
+
   for (uint32_t i = 0; i < len; i++) {
-    js_value_t *read;
-    err = js_get_element(env, argv[2], i, &read);
-    assert(err == 0);
+    js_value_t *read = elements[i];
 
     js_value_t *property;
 
@@ -1432,6 +1452,8 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
     }
     }
   }
+
+  free(elements);
 
   rocksdb_read_options_t options = {
     .version = 0,
@@ -1591,10 +1613,15 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
   err = js_create_reference(env, argv[4], 1, &req->on_status);
   assert(err == 0);
 
+  js_value_t **elements = malloc(len * sizeof(js_value_t *));
+
+  uint32_t fetched;
+  err = js_get_array_elements(env, argv[2], elements, len, 0, &fetched);
+  assert(err == 0);
+  assert(fetched == len);
+
   for (uint32_t i = 0; i < len; i++) {
-    js_value_t *write;
-    err = js_get_element(env, argv[2], i, &write);
-    assert(err == 0);
+    js_value_t *write = elements[i];
 
     js_value_t *property;
 
@@ -1667,6 +1694,8 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
     }
     }
   }
+
+  free(elements);
 
   err = rocksdb_write(&db->handle, &req->handle, req->writes, len, NULL, rocksdb_native__on_write);
   assert(err == 0);
