@@ -172,9 +172,19 @@ class RocksDB {
     this._state.activity.inc()
   }
 
+  _refBatch() {
+    this._ref()
+    this._state.activeBatches.inc()
+  }
+
   _unref() {
     if (this._snapshot) this._snapshot.unref()
     this._state.activity.dec()
+  }
+
+  _unrefBatch() {
+    this._unref()
+    this._state.activeBatches.dec()
   }
 }
 
