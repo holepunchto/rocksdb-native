@@ -772,7 +772,7 @@ test('suspend + write', async (t) => {
   await db.close()
 })
 
-test.solo('suspend + open new writer', async (t) => {
+test('suspend + open new writer', async (t) => {
   const dir = await tmp(t)
 
   const w1 = new RocksDB(dir)
