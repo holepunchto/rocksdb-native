@@ -1415,7 +1415,6 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
   assert(err == 0);
   assert(fetched == len);
 
-
   for (uint32_t i = 0; i < len; i++) {
     js_value_t *read = elements[i];
 
