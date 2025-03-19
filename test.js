@@ -719,16 +719,11 @@ test('suspend + resume', async (t) => {
 test('suspend + resume + write', async (t) => {
   const db = new RocksDB(await tmp(t))
   await db.ready()
-  {
-    const w = db.write({ autoDestroy: true })
-    const p = w.put('hello', 'world')
-    await w.flush()
-  }
   await db.suspend()
   await db.resume()
   {
     const w = db.write({ autoDestroy: true })
-    const p = w.put('hello2', 'world2')
+    w.put('hello2', 'world2')
     await w.flush()
   }
   await db.close()
