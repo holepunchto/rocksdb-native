@@ -741,12 +741,18 @@ test('suspend + read', async (t) => {
   await db.ready()
   await db.suspend()
 
+  let flushed = false
+
   const batch = db.read()
   const p = batch.get('hello')
-  await t.exception(batch.flush(), /Database is suspended/)
-  batch.destroy()
-  await t.exception(p, /Batch is destroyed/)
+  batch.flush().then(() => {
+    flushed = true
+  })
 
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  t.is(flushed, false)
+
+  p.catch(() => {}) // will abort due to close during suspend
   await db.close()
 })
 
@@ -755,12 +761,18 @@ test('suspend + write', async (t) => {
   await db.ready()
   await db.suspend()
 
+  let flushed = false
+
   const batch = db.write()
   const p = batch.put('hello', 'world')
-  await t.exception(batch.flush(), /Database is suspended/)
-  batch.destroy()
-  await t.exception(p, /Batch is destroyed/)
+  batch.flush().then(() => {
+    flushed = true
+  })
 
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  t.is(flushed, false)
+
+  p.catch(() => {}) // will abort due to close during suspend
   await db.close()
 })
 
@@ -777,7 +789,6 @@ test('suspend + open new writer', async (t) => {
   await t.exception(w1.resume())
 
   await w2.close()
-
   await t.execution(w1.resume())
 
   await w1.close()

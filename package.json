@@ -40,6 +40,7 @@
     "ready-resource": "^1.0.0",
     "refcounter": "^1.0.0",
     "require-addon": "^1.0.2",
+    "resolve-reject-promise": "^1.1.0",
     "streamx": "^2.16.1"
   },
   "devDependencies": {
