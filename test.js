@@ -745,9 +745,11 @@ test('suspend + read', async (t) => {
 
   const batch = db.read()
   const p = batch.get('hello')
-  batch.flush().then(() => { flushed = true })
+  batch.flush().then(() => {
+    flushed = true
+  })
 
-  await new Promise(resolve => setTimeout(resolve, 250))
+  await new Promise((resolve) => setTimeout(resolve, 250))
   t.is(flushed, false)
 
   p.catch(() => {}) // will abort due to close during suspend
@@ -763,9 +765,11 @@ test('suspend + write', async (t) => {
 
   const batch = db.write()
   const p = batch.put('hello', 'world')
-  batch.flush().then(() => { flushed = true })
+  batch.flush().then(() => {
+    flushed = true
+  })
 
-  await new Promise(resolve => setTimeout(resolve, 250))
+  await new Promise((resolve) => setTimeout(resolve, 250))
   t.is(flushed, false)
 
   p.catch(() => {}) // will abort due to close during suspend
