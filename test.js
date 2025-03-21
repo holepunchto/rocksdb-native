@@ -749,10 +749,10 @@ test('suspend + read', async (t) => {
     flushed = true
   })
 
-  await new Promise((resolve) => setTimeout(resolve, 250))
+  await wait(250)
   t.is(flushed, false)
 
-  p.catch(() => {}) // will abort due to close during suspend
+  p.catch(() => {}) // Will abort due to close during suspend
   await db.close()
 })
 
@@ -769,10 +769,33 @@ test('suspend + write', async (t) => {
     flushed = true
   })
 
-  await new Promise((resolve) => setTimeout(resolve, 250))
+  await wait(250)
   t.is(flushed, false)
 
-  p.catch(() => {}) // will abort due to close during suspend
+  p.catch(() => {}) // Will abort due to close during suspend
+  await db.close()
+})
+
+test('suspend + write + resume + suspend before fully resumed', async (t) => {
+  const db = new RocksDB(await tmp(t))
+  await db.ready()
+  await db.suspend()
+
+  let flushed = false
+
+  const batch = db.write()
+  const p = batch.put('hello', 'world')
+  batch.flush().then(() => {
+    flushed = true
+  })
+
+  db.resume()
+  await db.suspend()
+
+  await wait(250)
+  t.is(flushed, false)
+
+  p.catch(() => {}) // Will abort due to close during suspend
   await db.close()
 })
 
@@ -793,3 +816,7 @@ test('suspend + open new writer', async (t) => {
 
   await w1.close()
 })
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve), ms)
+}
