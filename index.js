@@ -101,11 +101,11 @@ class RocksDB {
   }
 
   isIdle() {
-    return this._state.activity.isIdle()
+    return this._state.handles.isIdle()
   }
 
   idle() {
-    return this._state.activity.idle()
+    return this._state.handles.idle()
   }
 
   iterator(range, opts) {
@@ -165,26 +165,14 @@ class RocksDB {
     await batch.flush()
   }
 
-  // used by iterators/batches to ensure no gc/close when active
-
   _ref() {
     if (this._snapshot) this._snapshot.ref()
-    this._state.activity.inc()
-  }
-
-  _refBatch() {
-    this._ref()
-    this._state.activeBatches.inc()
+    this._state.handles.inc()
   }
 
   _unref() {
     if (this._snapshot) this._snapshot.unref()
-    this._state.activity.dec()
-  }
-
-  _unrefBatch() {
-    this._unref()
-    this._state.activeBatches.dec()
+    this._state.handles.dec()
   }
 }
 
