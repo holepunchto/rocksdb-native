@@ -861,3 +861,33 @@ test('suspend + open new writer', async (t) => {
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve), ms)
 }
+
+test('suspend + flush + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.suspend()
+
+  let flushed = true
+
+  db.flush().catch(() => {
+    flushed = false
+  })
+
+  await db.close()
+
+  t.is(flushed, false)
+})
+
+test('suspend + flush + resume', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.suspend()
+
+  const p = db.flush()
+  await db.resume()
+  await p
+
+  t.pass()
+
+  await db.close()
+})
