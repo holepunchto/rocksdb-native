@@ -1,16 +1,15 @@
 const test = require('brittle')
-const tmp = require('test-tmp')
 const c = require('compact-encoding')
 const RocksDB = require('.')
 
 test('open + close', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
   await db.close()
 })
 
 test('write + read', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   {
@@ -32,7 +31,7 @@ test('write + read', async (t) => {
 })
 
 test('write + read multiple batches', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   {
@@ -55,7 +54,7 @@ test('write + read multiple batches', async (t) => {
 })
 
 test('write + read multiple', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   {
@@ -92,7 +91,7 @@ test('write + read multiple', async (t) => {
 })
 
 test('write + flush', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.write()
@@ -106,7 +105,7 @@ test('write + flush', async (t) => {
 })
 
 test('read missing', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.read()
@@ -119,7 +118,7 @@ test('read missing', async (t) => {
 })
 
 test('read + autoDestroy', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.read({ autoDestroy: true })
@@ -131,7 +130,7 @@ test('read + autoDestroy', async (t) => {
 })
 
 test('read with snapshot', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   {
@@ -164,7 +163,7 @@ test('read with snapshot', async (t) => {
 })
 
 test('delete range', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   {
@@ -207,7 +206,7 @@ test('delete range', async (t) => {
 })
 
 test('delete range, end does not exist', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   {
@@ -237,7 +236,7 @@ test('delete range, end does not exist', async (t) => {
 })
 
 test('prefix iterator', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.write()
@@ -265,7 +264,7 @@ test('prefix iterator', async (t) => {
 })
 
 test('prefix iterator, reverse', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.write()
@@ -296,7 +295,7 @@ test('prefix iterator, reverse', async (t) => {
 })
 
 test('prefix iterator, reverse with limit', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.write()
@@ -323,7 +322,7 @@ test('prefix iterator, reverse with limit', async (t) => {
 })
 
 test('iterator with encoding', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const session = db.session({ keyEncoding: c.string, valueEncoding: c.string })
@@ -350,7 +349,7 @@ test('iterator with encoding', async (t) => {
 })
 
 test('iterator with snapshot', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.write()
@@ -385,7 +384,7 @@ test('iterator with snapshot', async (t) => {
 })
 
 test('iterator with snapshot before db open', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
 
   const snapshot = db.snapshot()
 
@@ -411,8 +410,20 @@ test('iterator with snapshot before db open', async (t) => {
   await db.close()
 })
 
+test('destroy iterator immediately', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const it = db.iterator({ gte: 'a', lt: 'b' })
+  it.destroy()
+
+  t.pass()
+
+  await db.close()
+})
+
 test('destroy snapshot before db open', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
 
   const snapshot = db.snapshot()
   await snapshot.close()
@@ -422,7 +433,7 @@ test('destroy snapshot before db open', async (t) => {
 })
 
 test('peek', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.write()
@@ -441,7 +452,7 @@ test('peek', async (t) => {
 })
 
 test('peek, reverse', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const batch = db.write()
@@ -460,7 +471,7 @@ test('peek, reverse', async (t) => {
 })
 
 test('delete', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   {
@@ -491,7 +502,7 @@ test('delete', async (t) => {
 })
 
 test('idle', async function (t) {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   t.ok(db.isIdle())
@@ -557,7 +568,7 @@ test('idle', async function (t) {
 })
 
 test('write + read after close', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   await db.close()
@@ -567,7 +578,7 @@ test('write + read after close', async (t) => {
 })
 
 test('session reuse after close', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   const session = db.session()
@@ -585,7 +596,7 @@ test('session reuse after close', async (t) => {
 })
 
 test('put + get', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   await db.put('key', 'value')
@@ -595,7 +606,7 @@ test('put + get', async (t) => {
 })
 
 test('put + delete + get', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
   await db.put('key', 'value')
@@ -606,7 +617,7 @@ test('put + delete + get', async (t) => {
 })
 
 test('column families, batch per family', async (t) => {
-  const db = new RocksDB(await tmp(t), { columnFamilies: ['a', 'b'] })
+  const db = new RocksDB(await t.tmp(), { columnFamilies: ['a', 'b'] })
   await db.ready()
 
   const a = db.session({ columnFamily: 'a' })
@@ -646,7 +657,7 @@ test('column families, batch per family', async (t) => {
 })
 
 test('column families setup implicitly', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
 
   const a = db.columnFamily('a')
   const b = db.columnFamily('b')
@@ -661,7 +672,7 @@ test('column families setup implicitly', async (t) => {
 })
 
 test('read-only', async (t) => {
-  const dir = await tmp(t)
+  const dir = await t.tmp()
 
   const w = new RocksDB(dir)
   await w.ready()
@@ -690,7 +701,7 @@ test('read-only', async (t) => {
 })
 
 test('read-only + write', async (t) => {
-  const dir = await tmp(t)
+  const dir = await t.tmp()
 
   const w = new RocksDB(dir)
   await w.ready()
@@ -709,7 +720,7 @@ test('read-only + write', async (t) => {
 })
 
 test('suspend + resume', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
   await db.suspend()
   await db.resume()
@@ -717,7 +728,7 @@ test('suspend + resume', async (t) => {
 })
 
 test('suspend + resume + write', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
   await db.suspend()
   await db.resume()
@@ -730,14 +741,14 @@ test('suspend + resume + write', async (t) => {
 })
 
 test('suspend + close without resume', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
   await db.suspend()
   await db.close()
 })
 
 test('suspend + read', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
   await db.suspend()
 
@@ -749,15 +760,15 @@ test('suspend + read', async (t) => {
     flushed = true
   })
 
-  await new Promise((resolve) => setTimeout(resolve, 250))
+  await wait(250)
   t.is(flushed, false)
 
-  p.catch(() => {}) // will abort due to close during suspend
+  p.catch(() => {}) // Will abort due to close during suspend
   await db.close()
 })
 
 test('suspend + write', async (t) => {
-  const db = new RocksDB(await tmp(t))
+  const db = new RocksDB(await t.tmp())
   await db.ready()
   await db.suspend()
 
@@ -769,15 +780,68 @@ test('suspend + write', async (t) => {
     flushed = true
   })
 
-  await new Promise((resolve) => setTimeout(resolve, 250))
+  await wait(250)
   t.is(flushed, false)
 
-  p.catch(() => {}) // will abort due to close during suspend
+  p.catch(() => {}) // Will abort due to close during suspend
+  await db.close()
+})
+
+test('suspend + write + resume + suspend before fully resumed', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.suspend()
+
+  let flushed = false
+
+  const batch = db.write()
+  const p = batch.put('hello', 'world')
+  batch.flush().then(() => {
+    flushed = true
+  })
+
+  db.resume()
+  await db.suspend()
+
+  await wait(250)
+  t.is(flushed, true)
+  batch.destroy()
+
+  p.catch(() => {}) // Will abort due to close during suspend
+  await db.close()
+})
+
+test('iterator + suspend', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('hello', 'world')
+  await batch.flush()
+  batch.destroy()
+
+  const it = db.iterator({ gte: 'hello', lt: 'z' })
+
+  await db.suspend()
+
+  const gen = it[Symbol.asyncIterator]()
+  const p = gen.next()
+
+  await db.resume()
+
+  t.alike(await p, {
+    value: {
+      key: Buffer.from('hello'),
+      value: Buffer.from('world')
+    },
+    done: false
+  })
+
   await db.close()
 })
 
 test('suspend + open new writer', async (t) => {
-  const dir = await tmp(t)
+  const dir = await t.tmp()
 
   const w1 = new RocksDB(dir)
   await w1.ready()
@@ -793,3 +857,7 @@ test('suspend + open new writer', async (t) => {
 
   await w1.close()
 })
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve), ms)
+}
