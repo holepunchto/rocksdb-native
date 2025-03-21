@@ -418,6 +418,8 @@ test('destroy iterator immediately', async (t) => {
   it.destroy()
 
   t.pass()
+
+  await db.close()
 })
 
 test('destroy snapshot before db open', async (t) => {
