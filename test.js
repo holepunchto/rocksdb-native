@@ -840,6 +840,28 @@ test('iterator + suspend', async (t) => {
   await db.close()
 })
 
+test('iterator + suspend + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('hello', 'world')
+  await batch.flush()
+  batch.destroy()
+
+  const it = db.iterator({ gte: 'hello', lt: 'z' })
+
+  await db.suspend()
+
+  const gen = it[Symbol.asyncIterator]()
+  const p = gen.next()
+
+  p.catch(() => {})
+  await db.close()
+
+  await t.exception(p)
+})
+
 test('suspend + open new writer', async (t) => {
   const dir = await t.tmp()
 
