@@ -81,8 +81,9 @@ class RocksDB {
     if (this._index !== -1) this._state.removeSession(this)
 
     if (force) {
-      while (this._state.sessions.length > 0)
+      while (this._state.sessions.length > 0) {
         await this._state.sessions[this._state.sessions.length - 1].close()
+      }
     }
 
     return this.isRoot() ? this._state.close() : Promise.resolve()
