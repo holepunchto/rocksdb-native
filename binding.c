@@ -192,10 +192,8 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 
       js_value_t **elements = malloc(len * sizeof(js_value_t *));
 
-      uint32_t fetched;
-      err = js_get_array_elements(env, column_families, elements, len, 0, &fetched);
+      err = js_get_array_elements(env, column_families, elements, len, 0, NULL);
       assert(err == 0);
-      assert(fetched == len);
 
       for (uint32_t i = 0; i < len; i++) {
         js_value_t *handle = elements[i];
@@ -397,10 +395,8 @@ rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t **elements = malloc(len * sizeof(js_value_t *));
 
-  uint32_t fetched;
-  err = js_get_array_elements(env, argv[3], elements, len, 0, &fetched);
+  err = js_get_array_elements(env, argv[3], elements, len, 0, NULL);
   assert(err == 0);
-  assert(fetched == len);
 
   for (uint32_t i = 0; i < len; i++) {
     js_value_t *handle = elements[i];
@@ -1410,10 +1406,8 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t **elements = malloc(len * sizeof(js_value_t *));
 
-  uint32_t fetched;
-  err = js_get_array_elements(env, argv[2], elements, len, 0, &fetched);
+  err = js_get_array_elements(env, argv[2], elements, len, 0, NULL);
   assert(err == 0);
-  assert(fetched == len);
 
   for (uint32_t i = 0; i < len; i++) {
     js_value_t *read = elements[i];
@@ -1614,10 +1608,8 @@ rocksdb_native_write(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t **elements = malloc(len * sizeof(js_value_t *));
 
-  uint32_t fetched;
-  err = js_get_array_elements(env, argv[2], elements, len, 0, &fetched);
+  err = js_get_array_elements(env, argv[2], elements, len, 0, NULL);
   assert(err == 0);
-  assert(fetched == len);
 
   for (uint32_t i = 0; i < len; i++) {
     js_value_t *write = elements[i];
