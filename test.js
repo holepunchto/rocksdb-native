@@ -727,6 +727,14 @@ test('suspend + resume', async (t) => {
   await db.close()
 })
 
+test('suspend + resume + close before resolved', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  db.suspend()
+  db.resume()
+  await db.close()
+})
+
 test('suspend + resume + write', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
