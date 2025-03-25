@@ -748,6 +748,18 @@ test('suspend + resume + write', async (t) => {
   await db.close()
 })
 
+test('suspend + write + flush + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.suspend()
+  {
+    const w = db.write()
+    const p = w.flush()
+    p.catch(() => {})
+  }
+  await db.close()
+})
+
 test('suspend + close without resume', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
@@ -764,9 +776,10 @@ test('suspend + read', async (t) => {
 
   const batch = db.read()
   const p = batch.get('hello')
-  batch.flush().then(() => {
-    flushed = true
-  })
+  batch.flush().then(
+    () => (flushed = true),
+    () => {}
+  )
 
   await wait(250)
   t.is(flushed, false)
@@ -784,9 +797,10 @@ test('suspend + write', async (t) => {
 
   const batch = db.write()
   const p = batch.put('hello', 'world')
-  batch.flush().then(() => {
-    flushed = true
-  })
+  batch.flush().then(
+    () => (flushed = true),
+    () => {}
+  )
 
   await wait(250)
   t.is(flushed, false)
