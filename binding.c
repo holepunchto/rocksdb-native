@@ -85,7 +85,6 @@ typedef struct {
   rocksdb_read_batch_t handle;
 
   rocksdb_read_t *reads;
-  char **errors;
 
   size_t capacity;
 
@@ -98,7 +97,6 @@ typedef struct {
   rocksdb_write_batch_t handle;
 
   rocksdb_write_t *writes;
-  char **errors;
 
   size_t capacity;
 
@@ -1264,19 +1262,12 @@ rocksdb_native_read_buffer(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t *handle;
 
-  uint8_t *data;
-  err = js_create_arraybuffer(env, capacity * sizeof(rocksdb_read_t) + capacity * sizeof(char *), (void **) &data, &handle);
+  rocksdb_read_t *reads;
+  err = js_create_arraybuffer(env, capacity * sizeof(rocksdb_read_t), (void **) &reads, &handle);
   assert(err == 0);
 
   req->capacity = capacity;
-
-  size_t offset = 0;
-
-  req->reads = (rocksdb_read_t *) &data[offset];
-
-  offset += capacity * sizeof(rocksdb_read_t);
-
-  req->errors = (char **) &data[offset];
+  req->reads = reads;
 
   return handle;
 }
@@ -1300,7 +1291,7 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
       for (size_t i = 0; i < len; i++) {
         js_value_t *result;
 
-        char *error = req->errors[i];
+        char *error = req->handle.errors[i];
 
         if (error) continue;
 
@@ -1329,7 +1320,7 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
     for (size_t i = 0; i < len; i++) {
       js_value_t *result;
 
-      char *error = req->errors[i];
+      char *error = req->handle.errors[i];
 
       if (error) {
         err = js_create_string_utf8(env, (utf8_t *) error, -1, &result);
@@ -1461,7 +1452,7 @@ rocksdb_native_read(js_env_t *env, js_callback_info_t *info) {
     assert(err == 0);
   }
 
-  err = rocksdb_read(&db->handle, &req->handle, req->reads, req->errors, len, &options, rocksdb_native__on_read);
+  err = rocksdb_read(&db->handle, &req->handle, req->reads, len, &options, rocksdb_native__on_read);
   assert(err == 0);
 
   return NULL;
@@ -1505,19 +1496,12 @@ rocksdb_native_write_buffer(js_env_t *env, js_callback_info_t *info) {
 
   js_value_t *handle;
 
-  uint8_t *data;
-  err = js_create_arraybuffer(env, capacity * sizeof(rocksdb_write_t) + capacity * sizeof(char *), (void **) &data, &handle);
+  rocksdb_write_t *writes;
+  err = js_create_arraybuffer(env, capacity * sizeof(rocksdb_write_t), (void **) &writes, &handle);
   assert(err == 0);
 
   req->capacity = capacity;
-
-  size_t offset = 0;
-
-  req->writes = (rocksdb_write_t *) &data[offset];
-
-  offset += capacity * sizeof(rocksdb_write_t);
-
-  req->errors = (char **) &data[offset];
+  req->writes = writes;
 
   return handle;
 }
