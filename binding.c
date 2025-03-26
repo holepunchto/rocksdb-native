@@ -139,6 +139,10 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 
   js_env_t *env = req->env;
 
+  const rocksdb_column_family_descriptor_t *descriptors = handle->column_families;
+
+  rocksdb_column_family_t **handles = handle->handles;
+
   if (db->exiting) {
     err = js_delete_reference(env, req->on_open);
     assert(err == 0);
@@ -218,9 +222,9 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
     assert(err == 0);
   }
 
-  free((void *) handle->column_families);
+  free((void *) descriptors);
 
-  free(handle->handles);
+  free(handles);
 }
 
 static void
@@ -1770,7 +1774,7 @@ rocksdb_native_flush(js_env_t *env, js_callback_info_t *info) {
   err = rocksdb_flush(&db->handle, &req->handle, column_family->handle, NULL, rocksdb_native__on_flush);
   assert(err == 0);
 
-  return NULL;
+  return handle;
 }
 
 static js_value_t *
