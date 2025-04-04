@@ -35,7 +35,7 @@ target_link_libraries(
 )
 
 if(target MATCHES "linux")
-  target__options(
+  target_link_options(
     ${rocksdb_native_bare}
     PUBLIC
       -static-libstdc++
