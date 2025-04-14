@@ -15,6 +15,10 @@ endif()
 
 fetch_package("github:holepunchto/librocksdb#4a8e385")
 
+if(TARGET c++)
+  target_link_libraries(rocksdb PUBLIC c++)
+endif()
+
 add_bare_module(rocksdb_native_bare)
 
 target_sources(
@@ -34,7 +38,7 @@ target_link_libraries(
     path
 )
 
-if(target MATCHES "linux")
+if(target MATCHES "linux" AND NOT TARGET c++)
   target_link_options(
     ${rocksdb_native_bare}
     PUBLIC
