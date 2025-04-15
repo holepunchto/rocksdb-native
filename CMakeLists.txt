@@ -9,14 +9,11 @@ project(rocksdb_native C CXX)
 
 bare_target(target)
 
-if(target MATCHES "win32")
-  add_compile_options(/MT$<$<CONFIG:Debug>:d>)
-endif()
-
-fetch_package("github:holepunchto/librocksdb#4a8e385")
+fetch_package("github:holepunchto/librocksdb#1d5ffb4")
 
 if(TARGET c++)
   target_link_libraries(rocksdb PUBLIC c++)
+  target_link_libraries(rocksdb_facebook PUBLIC c++)
 endif()
 
 add_bare_module(rocksdb_native_bare)
