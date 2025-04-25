@@ -263,6 +263,30 @@ test('prefix iterator', async (t) => {
   await db.close()
 })
 
+test('key iterator', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', '')
+  batch.put('ab', '')
+  batch.put('ba', '')
+  batch.put('bb', '')
+  batch.put('ac', '')
+  await batch.flush()
+  batch.destroy()
+
+  const keys = []
+
+  for await (const key of db.iterator({ gte: 'a', lt: 'b', keysOnly: true })) {
+    keys.push(key)
+  }
+
+  t.alike(keys, [Buffer.from('aa'), Buffer.from('ab'), Buffer.from('ac')])
+
+  await db.close()
+})
+
 test('prefix iterator, reverse', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
