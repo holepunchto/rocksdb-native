@@ -278,7 +278,7 @@ test('key iterator', async (t) => {
 
   const keys = []
 
-  for await (const key of db.iterator({ gte: 'a', lt: 'b', keysOnly: true })) {
+  for await (const key of db.keyIterator({ gte: 'a', lt: 'b' })) {
     keys.push(key)
   }
 
