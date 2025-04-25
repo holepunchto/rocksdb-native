@@ -112,7 +112,7 @@ class RocksDB {
   iterator(range, opts) {
     maybeClosed(this)
 
-    return new Iterator(this, { ...range, ...opts })
+    return new Iterator(this, false, { ...range, ...opts })
   }
 
   keyIterator(range, opts) {
