@@ -1041,17 +1041,15 @@ rocksdb_native_iterator_open(js_env_t *env, js_callback_info_t *info) {
   err = js_get_typedarray_info(env, argv[6], NULL, (void **) &range.lte.data, &range.lte.len, NULL, NULL);
   assert(err == 0);
 
-  bool reverse;
-  err = js_get_value_bool(env, argv[7], &reverse);
-  assert(err == 0);
-
-  bool keys_only;
-  err = js_get_value_bool(env, argv[8], &keys_only);
-  assert(err == 0);
-
-  rocksdb_read_options_t options = {
+  rocksdb_iterator_options_t options = {
     .version = 0,
   };
+
+  err = js_get_value_bool(env, argv[7], &options.reverse);
+  assert(err == 0);
+
+  err = js_get_value_bool(env, argv[8], &options.keys_only);
+  assert(err == 0);
 
   bool has_snapshot;
   err = js_is_arraybuffer(env, argv[9], &has_snapshot);
@@ -1074,7 +1072,7 @@ rocksdb_native_iterator_open(js_env_t *env, js_callback_info_t *info) {
   err = js_create_reference(env, argv[13], 1, &req->on_read);
   assert(err == 0);
 
-  err = rocksdb_iterator_open(&db->handle, &req->handle, column_family->handle, range, reverse, keys_only, &options, rocksdb_native__on_iterator_open);
+  err = rocksdb_iterator_open(&db->handle, &req->handle, column_family->handle, range, &options, rocksdb_native__on_iterator_open);
   assert(err == 0);
 
   err = js_add_deferred_teardown_callback(env, rocksdb_native__on_iterator_teardown, (void *) req, &req->teardown);
