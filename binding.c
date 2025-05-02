@@ -1007,13 +1007,13 @@ static js_value_t *
 rocksdb_native_iterator_open(js_env_t *env, js_callback_info_t *info) {
   int err;
 
-  size_t argc = 13;
-  js_value_t *argv[13];
+  size_t argc = 14;
+  js_value_t *argv[14];
 
   err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
   assert(err == 0);
 
-  assert(argc == 13);
+  assert(argc == 14);
 
   rocksdb_native_t *db;
   err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
@@ -1041,36 +1041,38 @@ rocksdb_native_iterator_open(js_env_t *env, js_callback_info_t *info) {
   err = js_get_typedarray_info(env, argv[6], NULL, (void **) &range.lte.data, &range.lte.len, NULL, NULL);
   assert(err == 0);
 
-  bool reverse;
-  err = js_get_value_bool(env, argv[7], &reverse);
-  assert(err == 0);
-
-  rocksdb_read_options_t options = {
+  rocksdb_iterator_options_t options = {
     .version = 0,
   };
 
+  err = js_get_value_bool(env, argv[7], &options.reverse);
+  assert(err == 0);
+
+  err = js_get_value_bool(env, argv[8], &options.keys_only);
+  assert(err == 0);
+
   bool has_snapshot;
-  err = js_is_arraybuffer(env, argv[8], &has_snapshot);
+  err = js_is_arraybuffer(env, argv[9], &has_snapshot);
   assert(err == 0);
 
   if (has_snapshot) {
-    err = js_get_arraybuffer_info(env, argv[8], (void **) &options.snapshot, NULL);
+    err = js_get_arraybuffer_info(env, argv[9], (void **) &options.snapshot, NULL);
     assert(err == 0);
   }
 
-  err = js_create_reference(env, argv[9], 1, &req->ctx);
+  err = js_create_reference(env, argv[10], 1, &req->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[10], 1, &req->on_open);
+  err = js_create_reference(env, argv[11], 1, &req->on_open);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[11], 1, &req->on_close);
+  err = js_create_reference(env, argv[12], 1, &req->on_close);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[12], 1, &req->on_read);
+  err = js_create_reference(env, argv[13], 1, &req->on_read);
   assert(err == 0);
 
-  err = rocksdb_iterator_open(&db->handle, &req->handle, column_family->handle, range, reverse, &options, rocksdb_native__on_iterator_open);
+  err = rocksdb_iterator_open(&db->handle, &req->handle, column_family->handle, range, &options, rocksdb_native__on_iterator_open);
   assert(err == 0);
 
   err = js_add_deferred_teardown_callback(env, rocksdb_native__on_iterator_teardown, (void *) req, &req->teardown);

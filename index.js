@@ -115,6 +115,15 @@ class RocksDB {
     return new Iterator(this, { ...range, ...opts })
   }
 
+  async *keys(range, opts) {
+    for await (const { key } of this.iterator(range, {
+      ...opts,
+      values: false
+    })) {
+      yield key
+    }
+  }
+
   async peek(range, opts) {
     for await (const value of this.iterator({ ...range, ...opts, limit: 1 })) {
       return value

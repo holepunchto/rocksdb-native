@@ -9,7 +9,7 @@ project(rocksdb_native C CXX)
 
 bare_target(target)
 
-fetch_package("github:holepunchto/librocksdb#1d5ffb4")
+fetch_package("github:holepunchto/librocksdb#2abcccb")
 
 if(TARGET c++)
   target_link_libraries(rocksdb PUBLIC c++)
