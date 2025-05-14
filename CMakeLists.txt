@@ -35,14 +35,6 @@ target_link_libraries(
     path
 )
 
-if(target MATCHES "linux" AND NOT TARGET c++)
-  target_link_options(
-    ${rocksdb_native_bare}
-    PUBLIC
-      -static-libstdc++
-  )
-endif()
-
 add_napi_module(rocksdb_native_napi)
 
 target_sources(
@@ -61,14 +53,6 @@ target_link_libraries(
     rocksdb_facebook
     path
 )
-
-if(target MATCHES "linux")
-  target_link_options(
-    ${rocksdb_native_napi}
-    PUBLIC
-      -static-libstdc++
-  )
-endif()
 
 resolve_node_module(bare-compat-napi compat)
 
