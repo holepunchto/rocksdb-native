@@ -11,11 +11,6 @@ bare_target(target)
 
 fetch_package("github:holepunchto/librocksdb#2abcccb")
 
-if(TARGET c++)
-  target_link_libraries(rocksdb PUBLIC c++)
-  target_link_libraries(rocksdb_facebook PUBLIC c++)
-endif()
-
 add_bare_module(rocksdb_native_bare)
 
 target_sources(
