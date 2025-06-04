@@ -936,6 +936,45 @@ test('iterator + suspend + close', async (t) => {
   await t.exception(p)
 })
 
+test('make a batch, queue read, destroy + suspend + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.read()
+
+  batch.get(Buffer.from('hello')).catch(noop)
+  batch.destroy()
+
+  await db.suspend()
+  await db.close()
+})
+
+test('make a batch, queue write, destroy + suspend + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+
+  batch.put(Buffer.from('hello'), Buffer.from('world')).catch(noop)
+  batch.destroy()
+
+  await db.suspend()
+  await db.close()
+})
+
+test('make a batch, queue delete, destroy + suspend + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+
+  batch.delete(Buffer.from('hello')).catch(noop)
+  batch.destroy()
+
+  await db.suspend()
+  await db.close()
+})
+
 test('suspend + open new writer', async (t) => {
   const dir = await t.tmp()
 
@@ -987,3 +1026,5 @@ test('suspend + flush + resume', async (t) => {
 
   await db.close()
 })
+
+function noop() {}
