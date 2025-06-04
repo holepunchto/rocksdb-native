@@ -38,6 +38,12 @@ target_sources(
     binding.c
 )
 
+target_compile_definitions(
+  ${rocksdb_native_napi}
+  PRIVATE
+    NAPI_VERSION=9
+)
+
 target_link_libraries(
   ${rocksdb_native_napi}
   PRIVATE
