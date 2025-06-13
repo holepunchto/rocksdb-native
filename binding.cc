@@ -1718,26 +1718,14 @@ rocksdb_native_flush(
   return handle;
 }
 
-static js_value_t *
-rocksdb_native_snapshot_create(js_env_t *env, js_callback_info_t *info) {
+static js_arraybuffer_t
+rocksdb_native_snapshot_create(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_t, 1> db) {
   int err;
 
-  size_t argc = 1;
-  js_value_t *argv[1];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 1);
-
-  rocksdb_native_t *db;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
-  assert(err == 0);
-
-  js_value_t *handle;
+  js_arraybuffer_t handle;
 
   rocksdb_native_snapshot_t *snapshot;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_snapshot_t), (void **) &snapshot, &handle);
+  err = js_create_arraybuffer(env, snapshot, handle);
   assert(err == 0);
 
   err = rocksdb_snapshot_create(&db->handle, &snapshot->handle);
@@ -1746,25 +1734,9 @@ rocksdb_native_snapshot_create(js_env_t *env, js_callback_info_t *info) {
   return handle;
 }
 
-static js_value_t *
-rocksdb_native_snapshot_destroy(js_env_t *env, js_callback_info_t *info) {
-  int err;
-
-  size_t argc = 1;
-  js_value_t *argv[1];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 1);
-
-  rocksdb_native_snapshot_t *snapshot;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &snapshot, NULL);
-  assert(err == 0);
-
+static void
+rocksdb_native_snapshot_destroy(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_snapshot_t, 1> snapshot) {
   rocksdb_snapshot_destroy(&snapshot->handle);
-
-  return NULL;
 }
 
 static js_value_t *
@@ -1779,6 +1751,9 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("suspend", rocksdb_native_suspend)
   V("resume", rocksdb_native_resume)
   V("flush", rocksdb_native_flush)
+
+  V("snapshotCreate", rocksdb_native_snapshot_create)
+  V("snapshotDestroy", rocksdb_native_snapshot_destroy)
 #undef V
 
 #define V(name, fn) \
@@ -1809,9 +1784,6 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("writeInit", rocksdb_native_write_init)
   V("writeBuffer", rocksdb_native_write_buffer)
   V("write", rocksdb_native_write)
-
-  V("snapshotCreate", rocksdb_native_snapshot_create)
-  V("snapshotDestroy", rocksdb_native_snapshot_destroy)
 #undef V
 
 #define V(name, n) \
