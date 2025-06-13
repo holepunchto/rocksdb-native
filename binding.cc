@@ -363,7 +363,7 @@ rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
     create_if_missing,
     create_missing_column_families,
     max_background_jobs,
-    static_cast<uint64_t>(bytes_per_sync),
+    uint64_t(bytes_per_sync),
     max_open_files,
     use_direct_reads
   };
@@ -504,7 +504,10 @@ rocksdb_native__on_suspend(rocksdb_suspend_t *handle, int status) {
 
   js_deferred_teardown_t *teardown = db->teardown;
 
-  if (!db->exiting) {
+  if (db->exiting) {
+    req->on_suspend.reset();
+    req->ctx.reset();
+  } else {
     js_handle_scope_t *scope;
     err = js_open_handle_scope(env, &scope);
     assert(err == 0);
@@ -713,7 +716,7 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
   V(no_block_cache, bool)
   V(filter_policy_type, uint32)
 
-  rocksdb_filter_policy_t filter_policy = {static_cast<rocksdb_filter_policy_type_t>(filter_policy_type)};
+  rocksdb_filter_policy_t filter_policy = {rocksdb_filter_policy_type_t(filter_policy_type)};
 
   switch (filter_policy_type) {
   case rocksdb_bloom_filter_policy: {
@@ -761,10 +764,10 @@ rocksdb_native_column_family_init(js_env_t *env, js_callback_info_t *info) {
       2,
       rocksdb_level_compaction,
       enable_blob_files,
-      static_cast<uint64_t>(min_blob_size),
-      static_cast<uint64_t>(blob_file_size),
+      uint64_t(min_blob_size),
+      uint64_t(blob_file_size),
       enable_blob_garbage_collection,
-      static_cast<uint64_t>(table_block_size),
+      uint64_t(table_block_size),
       table_cache_index_and_filter_blocks,
       table_format_version,
       optimize_filters_for_memory,
