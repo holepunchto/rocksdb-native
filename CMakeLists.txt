@@ -10,13 +10,14 @@ project(rocksdb_native C CXX)
 bare_target(target)
 
 fetch_package("github:holepunchto/librocksdb#2abcccb")
+fetch_package("github:holepunchto/libjstl#122cbdd")
 
 add_bare_module(rocksdb_native_bare)
 
 target_sources(
   ${rocksdb_native_bare}
   PRIVATE
-    binding.c
+    binding.cc
 )
 
 target_link_libraries(
@@ -24,6 +25,7 @@ target_link_libraries(
   PRIVATE
     $<TARGET_OBJECTS:rocksdb>
     $<TARGET_OBJECTS:path>
+    jstl
   PUBLIC
     rocksdb
     rocksdb_facebook
@@ -35,7 +37,7 @@ add_napi_module(rocksdb_native_napi)
 target_sources(
   ${rocksdb_native_napi}
   PRIVATE
-    binding.c
+    binding.cc
 )
 
 target_compile_definitions(
@@ -49,6 +51,7 @@ target_link_libraries(
   PRIVATE
     $<TARGET_OBJECTS:rocksdb>
     $<TARGET_OBJECTS:path>
+    jstl
   PUBLIC
     rocksdb
     rocksdb_facebook
