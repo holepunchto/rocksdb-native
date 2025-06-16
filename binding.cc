@@ -307,45 +307,27 @@ rocksdb_native__on_teardown(js_deferred_teardown_t *handle, void *data) {
   assert(err == 0);
 }
 
-static js_value_t *
-rocksdb_native_init(js_env_t *env, js_callback_info_t *info) {
+static js_arraybuffer_t
+rocksdb_native_init(
+  js_env_t *env,
+  bool read_only,
+  bool create_if_missing,
+  bool create_missing_column_families,
+  int32_t max_background_jobs,
+  int64_t bytes_per_sync,
+  int32_t max_open_files,
+  bool use_direct_reads
+) {
   int err;
-
-  size_t argc = 7;
-  js_value_t *argv[7];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 7);
-
-  typedef bool bool_t;
-
-#define V(name, type) \
-  assert(i < argc); \
-  type##_t name; \
-  err = js_get_value_##type(env, argv[i++], &name); \
-  assert(err == 0);
-
-  int i = 0;
-
-  V(read_only, bool)
-  V(create_if_missing, bool)
-  V(create_missing_column_families, bool)
-  V(max_background_jobs, int32)
-  V(bytes_per_sync, int64)
-  V(max_open_files, int32)
-  V(use_direct_reads, bool)
-#undef V
 
   uv_loop_t *loop;
   err = js_get_env_loop(env, &loop);
   assert(err == 0);
 
-  js_value_t *handle;
+  js_arraybuffer_t handle;
 
   rocksdb_native_t *db;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_t), (void **) &db, &handle);
+  err = js_create_arraybuffer(env, db, handle);
   assert(err == 0);
 
   db->env = env;
@@ -1747,6 +1729,8 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   err = js_set_property<fn>(env, exports, name); \
   assert(err == 0);
 
+  V("init", rocksdb_native_init)
+
   V("close", rocksdb_native_close)
   V("suspend", rocksdb_native_suspend)
   V("resume", rocksdb_native_resume)
@@ -1765,7 +1749,6 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
     assert(err == 0); \
   }
 
-  V("init", rocksdb_native_init)
   V("open", rocksdb_native_open)
 
   V("columnFamilyInit", rocksdb_native_column_family_init)
