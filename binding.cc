@@ -256,6 +256,8 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
     if (db->closing) {
       req->on_close.reset();
       req->ctx.reset();
+    } else {
+      free(req);
     }
   } else {
     js_handle_scope_t *scope;
