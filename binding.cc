@@ -316,7 +316,7 @@ rocksdb_native_init(
   bool create_if_missing,
   bool create_missing_column_families,
   int32_t max_background_jobs,
-  int64_t bytes_per_sync,
+  uint64_t bytes_per_sync,
   int32_t max_open_files,
   bool use_direct_reads
 ) {
@@ -342,7 +342,7 @@ rocksdb_native_init(
     create_if_missing,
     create_missing_column_families,
     max_background_jobs,
-    uint64_t(bytes_per_sync),
+    bytes_per_sync,
     max_open_files,
     use_direct_reads
   };
