@@ -8,6 +8,7 @@
 #include <utf.h>
 
 namespace {
+using cb_on_open_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
 using cb_on_close_t = js_function_t<void, js_receiver_t>;
 using cb_on_suspend_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
 using cb_on_resume_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
@@ -22,7 +23,7 @@ struct rocksdb_native_column_family_t {
   rocksdb_t *db;
 
   js_env_t *env;
-  js_ref_t *ctx;
+  js_persistent_t<js_receiver_t> ctx;
 };
 
 struct rocksdb_native_t {
@@ -30,7 +31,7 @@ struct rocksdb_native_t {
   rocksdb_options_t options;
 
   js_env_t *env;
-  js_ref_t *ctx;
+  js_persistent_t<js_receiver_t> ctx;
 
   bool closing;
   bool exiting;
@@ -42,10 +43,10 @@ struct rocksdb_native_open_t {
   rocksdb_open_t handle;
 
   js_env_t *env;
-  js_ref_t *ctx;
-  js_ref_t *on_open;
+  js_persistent_t<js_receiver_t> ctx;
+  js_persistent_t<cb_on_open_t> on_open;
 
-  js_ref_t *column_families;
+  js_persistent_t<js_array_t> column_families;
 };
 
 struct rocksdb_native_close_t {
@@ -153,87 +154,68 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
   rocksdb_column_family_t **handles = handle->handles;
 
   if (db->exiting) {
-    err = js_delete_reference(env, req->on_open);
-    assert(err == 0);
-
-    err = js_delete_reference(env, req->ctx);
-    assert(err == 0);
+    req->on_open.reset();
+    req->ctx.reset();
   } else {
     js_handle_scope_t *scope;
     err = js_open_handle_scope(env, &scope);
     assert(err == 0);
 
-    js_value_t *ctx;
-    err = js_get_reference_value(env, req->ctx, &ctx);
+    js_receiver_t ctx;
+    err = js_get_reference_value(env, req->ctx, ctx);
     assert(err == 0);
 
-    js_value_t *cb;
-    err = js_get_reference_value(env, req->on_open, &cb);
+    cb_on_open_t cb;
+    err = js_get_reference_value(env, req->on_open, cb);
     assert(err == 0);
 
-    js_value_t *column_families;
-    err = js_get_reference_value(env, req->column_families, &column_families);
+    js_array_t column_families;
+    err = js_get_reference_value(env, req->column_families, column_families);
     assert(err == 0);
 
-    err = js_delete_reference(env, req->on_open);
-    assert(err == 0);
+    req->on_open.reset();
+    req->column_families.reset();
+    req->ctx.reset();
 
-    err = js_delete_reference(env, req->column_families);
-    assert(err == 0);
-
-    err = js_delete_reference(env, req->ctx);
-    assert(err == 0);
-
-    js_value_t *error;
+    std::optional<js_string_t> error;
 
     if (req->handle.error) {
-      err = js_create_string_utf8(env, (utf8_t *) req->handle.error, -1, &error);
-      assert(err == 0);
-    } else {
-      err = js_get_null(env, &error);
+      err = js_create_string(env, req->handle.error, error.emplace());
       assert(err == 0);
     }
 
     rocksdb_column_family_t **handles = handle->handles;
 
     if (req->handle.error == NULL) {
-      uint32_t len;
-      err = js_get_array_length(env, column_families, &len);
+      std::vector<js_arraybuffer_t> elements;
+
+      err = js_get_array_elements(env, column_families, elements);
       assert(err == 0);
 
-      auto elements = reinterpret_cast<js_value_t **>(malloc(len * sizeof(js_value_t *)));
-
-      err = js_get_array_elements(env, column_families, elements, len, 0, NULL);
-      assert(err == 0);
+      const auto len = elements.size();
 
       for (uint32_t i = 0; i < len; i++) {
-        js_value_t *handle = elements[i];
+        js_arraybuffer_t handle = elements[i];
 
         rocksdb_native_column_family_t *column_family;
-        err = js_get_arraybuffer_info(env, handle, (void **) &column_family, NULL);
+        err = js_get_arraybuffer_info(env, handle, column_family);
         assert(err == 0);
 
         column_family->handle = handles[i];
 
-        err = js_reference_ref(env, column_family->ctx = db->ctx, NULL);
-        assert(err == 0);
+        // err = js_reference_ref(env, column_family->ctx = db->ctx, NULL);
+        // assert(err == 0);
 
         err = js_add_teardown_callback(env, rocksdb_native__on_column_family_teardown, (void *) column_family);
         assert(err == 0);
       }
-
-      free(elements);
     }
 
-    js_call_function_with_checkpoint(env, ctx, cb, 1, (js_value_t *[]) {error}, NULL);
+    js_call_function_with_checkpoint(env, cb, ctx, error);
 
     err = js_close_handle_scope(env, scope);
     assert(err == 0);
   }
-
-  free((void *) descriptors);
-
-  free(handles);
 }
 
 static void
@@ -251,8 +233,7 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
   js_deferred_teardown_t *teardown = db->teardown;
 
   if (db->exiting) {
-    err = js_delete_reference(env, db->ctx);
-    assert(err == 0);
+    db->ctx.reset();
 
     if (db->closing) {
       req->on_close.reset();
@@ -273,9 +254,7 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
     err = js_get_reference_value(env, req->on_close, cb);
     assert(err == 0);
 
-    err = js_delete_reference(env, db->ctx);
-    assert(err == 0);
-
+    db->ctx.reset();
     req->on_close.reset();
     req->ctx.reset();
 
@@ -354,42 +333,32 @@ rocksdb_native_init(
   return handle;
 }
 
-static js_value_t *
-rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
+static js_arraybuffer_t
+rocksdb_native_open(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
+  js_receiver_t self,
+  char *path,
+  js_array_t column_families_array,
+  js_receiver_t ctx,
+  cb_on_open_t on_open
+) {
   int err;
 
-  size_t argc = 6;
-  js_value_t *argv[6];
+  std::vector<js_arraybuffer_t> elements;
 
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
+  err = js_get_array_elements(env, column_families_array, elements);
   assert(err == 0);
 
-  assert(argc == 6);
+  const auto len = elements.size();
 
-  rocksdb_native_t *db;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &db, NULL);
-  assert(err == 0);
-
-  utf8_t path[4096 + 1 /* NULL */];
-  err = js_get_value_string_utf8(env, argv[2], path, sizeof(path), NULL);
-  assert(err == 0);
-
-  uint32_t len;
-  err = js_get_array_length(env, argv[3], &len);
-  assert(err == 0);
-
-  auto column_families = reinterpret_cast<rocksdb_column_family_descriptor_t *>(calloc(len, sizeof(rocksdb_column_family_descriptor_t)));
-
-  auto elements = reinterpret_cast<js_value_t **>(malloc(len * sizeof(js_value_t *)));
-
-  err = js_get_array_elements(env, argv[3], elements, len, 0, NULL);
-  assert(err == 0);
+  auto column_families = new rocksdb_column_family_descriptor_t[len];
 
   for (uint32_t i = 0; i < len; i++) {
-    js_value_t *handle = elements[i];
+    js_arraybuffer_t handle = elements[i];
 
     rocksdb_native_column_family_t *column_family;
-    err = js_get_arraybuffer_info(env, handle, (void **) &column_family, NULL);
+    err = js_get_arraybuffer_info(env, handle, column_family);
     assert(err == 0);
 
     memcpy(&column_families[i], &column_family->descriptor, sizeof(rocksdb_column_family_descriptor_t));
@@ -397,32 +366,30 @@ rocksdb_native_open(js_env_t *env, js_callback_info_t *info) {
     column_family->db = &db->handle;
   }
 
-  free(elements);
+  auto handles = new rocksdb_column_family_t *[len];
 
-  auto handles = reinterpret_cast<rocksdb_column_family_t **>(calloc(len, sizeof(rocksdb_column_family_t *)));
-
-  js_value_t *handle;
+  js_arraybuffer_t handle;
 
   rocksdb_native_open_t *req;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_open_t), (void **) &req, &handle);
+  err = js_create_arraybuffer(env, req, handle);
   assert(err == 0);
 
   req->env = env;
-  req->handle.data = (void *) req;
+  req->handle.data = req;
 
-  err = js_create_reference(env, argv[1], 1, &db->ctx);
+  err = js_create_reference(env, self, db->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[4], 1, &req->ctx);
+  err = js_create_reference(env, ctx, req->ctx);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[5], 1, &req->on_open);
+  err = js_create_reference(env, on_open, req->on_open);
   assert(err == 0);
 
-  err = js_create_reference(env, argv[3], 1, &req->column_families);
+  err = js_create_reference(env, column_families_array, req->column_families);
   assert(err == 0);
 
-  err = rocksdb_open(&db->handle, &req->handle, (const char *) path, &db->options, column_families, handles, len, rocksdb_native__on_open);
+  err = rocksdb_open(&db->handle, &req->handle, path, &db->options, column_families, handles, len, rocksdb_native__on_open);
   assert(err == 0);
 
   err = js_add_deferred_teardown_callback(env, rocksdb_native__on_teardown, (void *) db, &db->teardown);
@@ -625,7 +592,8 @@ rocksdb_native__on_column_family_teardown(void *data) {
   err = rocksdb_column_family_destroy(column_family->db, column_family->handle);
   assert(err == 0);
 
-  err = js_reference_unref(env, column_family->ctx, NULL);
+  column_family->ctx.reset();
+
   assert(err == 0);
 }
 
@@ -760,8 +728,7 @@ rocksdb_native_column_family_destroy(js_env_t *env, js_callback_info_t *info) {
   err = js_remove_teardown_callback(env, rocksdb_native__on_column_family_teardown, (void *) column_family);
   assert(err == 0);
 
-  err = js_reference_unref(env, column_family->ctx, NULL);
-  assert(err == 0);
+  column_family->ctx.reset();
 
   column_family->handle = NULL;
 
@@ -1695,6 +1662,7 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   assert(err == 0);
 
   V("init", rocksdb_native_init)
+  V("open", rocksdb_native_open)
   V("close", rocksdb_native_close)
   V("suspend", rocksdb_native_suspend)
   V("resume", rocksdb_native_resume)
@@ -1717,8 +1685,6 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
     err = js_set_named_property(env, exports, name, val); \
     assert(err == 0); \
   }
-
-  V("open", rocksdb_native_open)
 
   V("columnFamilyInit", rocksdb_native_column_family_init)
   V("columnFamilyDestroy", rocksdb_native_column_family_destroy)
