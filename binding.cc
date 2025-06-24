@@ -1434,7 +1434,7 @@ rocksdb_native_write_buffer(
   js_arraybuffer_t handle;
 
   rocksdb_write_t *writes;
-  err = js_create_arraybuffer(env, capacity * sizeof(rocksdb_write_t), writes, handle);
+  err = js_create_arraybuffer(env, capacity, writes, handle);
   assert(err == 0);
 
   req->capacity = capacity;
@@ -1515,12 +1515,8 @@ rocksdb_native_write(
   for (uint32_t i = 0; i < len; i++) {
     js_object_t write = elements[i];
 
-    js_handle_t type_property;
-    err = js_get_property(env, write, "type", type_property);
-    assert(err == 0);
-
     rocksdb_write_type_t type;
-    err = js_get_value_uint32(env, static_cast<js_value_t *>(type_property), reinterpret_cast<uint32_t *>(&type));
+    err = js_get_property(env, write, "type", reinterpret_cast<uint32_t &>(type));
     assert(err == 0);
 
     req->writes[i].type = type;
