@@ -23,7 +23,7 @@ struct rocksdb_native_column_family_t {
   rocksdb_t *db;
 
   js_env_t *env;
-  js_persistent_t<js_receiver_t> ctx;
+  js_ref_t *ctx;
 };
 
 struct rocksdb_native_t {
@@ -203,8 +203,8 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 
         column_family->handle = handles[i];
 
-        // err = js_reference_ref(env, column_family->ctx = db->ctx, NULL);
-        // assert(err == 0);
+        err = js_reference_ref(env, column_family->ctx = static_cast<js_ref_t *>(db->ctx), NULL);
+        assert(err == 0);
 
         err = js_add_teardown_callback(env, rocksdb_native__on_column_family_teardown, (void *) column_family);
         assert(err == 0);
@@ -592,8 +592,7 @@ rocksdb_native__on_column_family_teardown(void *data) {
   err = rocksdb_column_family_destroy(column_family->db, column_family->handle);
   assert(err == 0);
 
-  column_family->ctx.reset();
-
+  err = js_reference_unref(env, column_family->ctx, NULL);
   assert(err == 0);
 }
 
@@ -728,7 +727,8 @@ rocksdb_native_column_family_destroy(js_env_t *env, js_callback_info_t *info) {
   err = js_remove_teardown_callback(env, rocksdb_native__on_column_family_teardown, (void *) column_family);
   assert(err == 0);
 
-  column_family->ctx.reset();
+  err = js_reference_unref(env, column_family->ctx, NULL);
+  assert(err == 0);
 
   column_family->handle = NULL;
 
