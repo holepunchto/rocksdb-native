@@ -203,7 +203,7 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 
         column_family->handle = handles[i];
 
-        err = js_reference_ref(env, column_family->ctx = static_cast<js_ref_t *>(db->ctx), NULL);
+        err = js_create_reference(env, ctx, column_family->ctx);
         assert(err == 0);
 
         err = js_add_teardown_callback(env, rocksdb_native__on_column_family_teardown, (void *) column_family);
