@@ -215,6 +215,9 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 
     err = js_close_handle_scope(env, scope);
     assert(err == 0);
+
+    delete[] descriptors;
+    delete[] handles;
   }
 }
 
@@ -609,7 +612,7 @@ rocksdb_native_column_family_init(
   bool optimize_filters_for_memory,
   bool no_block_cache,
   uint32_t filter_policy_type,
-  double_t bits_per_key,
+  double bits_per_key,
   int32_t bloom_before_level = 0
 ) {
   int err;
@@ -672,12 +675,11 @@ rocksdb_native_column_family_init(
 }
 
 static void
-rocksdb_native_column_family_destroy(js_env_t *env, js_arraybuffer_t handle) {
+rocksdb_native_column_family_destroy(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family
+) {
   int err;
-
-  rocksdb_native_column_family_t *column_family;
-  err = js_get_arraybuffer_info(env, handle, column_family);
-  assert(err == 0);
 
   if (column_family->handle == NULL) return;
 
