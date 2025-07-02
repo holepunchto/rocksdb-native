@@ -1034,30 +1034,16 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
   }
 }
 
-static js_value_t *
-rocksdb_native_iterator_read(js_env_t *env, js_callback_info_t *info) {
+static void
+rocksdb_native_iterator_read(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<rocksdb_native_iterator_t, 1> req,
+  uint32_t capacity
+) {
   int err;
-
-  size_t argc = 2;
-  js_value_t *argv[2];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 2);
-
-  rocksdb_native_iterator_t *req;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &req, NULL);
-  assert(err == 0);
-
-  uint32_t capacity;
-  err = js_get_value_uint32(env, argv[1], &capacity);
-  assert(err == 0);
 
   err = rocksdb_iterator_read(&req->handle, req->keys, req->values, capacity, rocksdb_native__on_iterator_read);
   assert(err == 0);
-
-  return NULL;
 }
 
 static js_value_t *
@@ -1598,6 +1584,7 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("iteratorBuffer", rocksdb_native_iterator_buffer)
   V("iteratorOpen", rocksdb_native_iterator_open)
   V("iteratorClose", rocksdb_native_iterator_close)
+  V("iteratorRead", rocksdb_native_iterator_read)
 
   V("flush", rocksdb_native_flush)
 
@@ -1613,8 +1600,6 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
     err = js_set_named_property(env, exports, name, val); \
     assert(err == 0); \
   }
-
-  V("iteratorRead", rocksdb_native_iterator_read)
 
   V("readInit", rocksdb_native_read_init)
   V("readBuffer", rocksdb_native_read_buffer)
