@@ -908,28 +908,14 @@ rocksdb_native_iterator_open(
   assert(err == 0);
 }
 
-static js_value_t *
-rocksdb_native_iterator_close(js_env_t *env, js_callback_info_t *info) {
+static void
+rocksdb_native_iterator_close(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_iterator_t, 1> req) {
   int err;
-
-  size_t argc = 1;
-  js_value_t *argv[1];
-
-  err = js_get_callback_info(env, info, &argc, argv, NULL, NULL);
-  assert(err == 0);
-
-  assert(argc == 1);
-
-  rocksdb_native_iterator_t *req;
-  err = js_get_arraybuffer_info(env, argv[0], (void **) &req, NULL);
-  assert(err == 0);
 
   req->closing = true;
 
   err = rocksdb_iterator_close(&req->handle, rocksdb_native__on_iterator_close);
   assert(err == 0);
-
-  return NULL;
 }
 
 static int
@@ -1578,6 +1564,7 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("iteratorInit", rocksdb_native_iterator_init)
   V("iteratorBuffer", rocksdb_native_iterator_buffer)
   V("iteratorOpen", rocksdb_native_iterator_open)
+  V("iteratorClose", rocksdb_native_iterator_close)
 
   V("flush", rocksdb_native_flush)
 
@@ -1594,7 +1581,6 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
     assert(err == 0); \
   }
 
-  V("iteratorClose", rocksdb_native_iterator_close)
   V("iteratorRead", rocksdb_native_iterator_read)
 #undef V
 
