@@ -695,20 +695,20 @@ rocksdb_native_column_family_destroy(
   column_family->handle = NULL;
 }
 
-static js_value_t *
-rocksdb_native_iterator_init(js_env_t *env, js_callback_info_t *info) {
+static js_arraybuffer_t
+rocksdb_native_iterator_init(js_env_t *env) {
   int err;
 
-  js_value_t *handle;
+  js_arraybuffer_t handle;
 
   rocksdb_native_iterator_t *req;
-  err = js_create_arraybuffer(env, sizeof(rocksdb_native_iterator_t), (void **) &req, &handle);
+  err = js_create_arraybuffer(env, req, handle);
   assert(err == 0);
 
   req->env = env;
   req->closing = false;
   req->exiting = false;
-  req->handle.data = (void *) req;
+  req->handle.data = req;
 
   return handle;
 }
@@ -1610,6 +1610,8 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("writeBuffer", rocksdb_native_write_buffer)
   V("write", rocksdb_native_write)
 
+  V("iteratorInit", rocksdb_native_iterator_init)
+
   V("flush", rocksdb_native_flush)
 
   V("snapshotCreate", rocksdb_native_snapshot_create)
@@ -1625,7 +1627,6 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
     assert(err == 0); \
   }
 
-  V("iteratorInit", rocksdb_native_iterator_init)
   V("iteratorBuffer", rocksdb_native_iterator_buffer)
   V("iteratorOpen", rocksdb_native_iterator_open)
   V("iteratorClose", rocksdb_native_iterator_close)
