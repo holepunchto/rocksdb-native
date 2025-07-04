@@ -938,18 +938,11 @@ rocksdb_native_try_create_external_arraybuffer(js_env_t *env, void *data, size_t
 static int
 rocksdb_native_try_create_external_arraybuffer(js_env_t *env, char *data, size_t len, js_arraybuffer_t &result) {
   // the external arraybuffer api is optional per (https://nodejs.org/api/n-api.html#napi_create_external_arraybuffer)
-  // so provide a fallback that does a memcpy
+  // so provide a fallback that does a std::copy
   int err = js_create_external_arraybuffer(env, data, len, result);
   if (err == 0) return 0;
 
-  void *cpy;
-  err = js_create_arraybuffer(env, &cpy, len, result);
-  if (err != 0) return err;
-
-  memcpy(cpy, data, len);
-  free(data);
-
-  return 0;
+  return js_create_arraybuffer(env, data, len, result);
 }
 
 static void
@@ -991,11 +984,11 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
 
     std::optional<js_string_t> error;
 
-    std::vector<js_arraybuffer_t> keys;
-    keys.reserve(len);
+    std::vector<js_arraybuffer_t> keys_elements;
+    keys_elements.reserve(len);
 
-    std::vector<js_arraybuffer_t> values;
-    values.reserve(len);
+    std::vector<js_arraybuffer_t> values_elements;
+    values_elements.reserve(len);
 
     if (req->handle.error) {
       err = js_create_string(env, req->handle.error, error.emplace());
@@ -1009,26 +1002,26 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
         err = rocksdb_native_try_create_external_arraybuffer(env, const_cast<char *>(key->data), key->len, result);
         assert(err == 0);
 
-        keys.push_back(result);
+        keys_elements.push_back(result);
 
         rocksdb_slice_t *value = &req->values[i];
 
         err = rocksdb_native_try_create_external_arraybuffer(env, const_cast<char *>(value->data), value->len, result);
         assert(err == 0);
 
-        values.push_back(result);
+        values_elements.push_back(result);
       }
     }
 
-    js_array_t keys_array;
-    err = js_create_array(env, keys, keys_array);
+    js_array_t keys;
+    err = js_create_array(env, keys_elements, keys);
     assert(err == 0);
 
-    js_array_t values_array;
-    err = js_create_array(env, values, values_array);
+    js_array_t values;
+    err = js_create_array(env, values_elements, values);
     assert(err == 0);
 
-    js_call_function_with_checkpoint(env, cb, ctx, error, keys_array, values_array);
+    js_call_function_with_checkpoint(env, cb, ctx, error, keys, values);
 
     err = js_close_handle_scope(env, scope);
     assert(err == 0);
