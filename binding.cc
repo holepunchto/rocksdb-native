@@ -995,18 +995,11 @@ rocksdb_native_try_create_external_arraybuffer(js_env_t *env, void *data, size_t
 static int
 rocksdb_native_try_create_external_arraybuffer(js_env_t *env, char *data, size_t len, js_arraybuffer_t &result) {
   // the external arraybuffer api is optional per (https://nodejs.org/api/n-api.html#napi_create_external_arraybuffer)
-  // so provide a fallback that does a memcpy
+  // so provide a fallback that does a std::copy
   int err = js_create_external_arraybuffer(env, data, len, result);
   if (err == 0) return 0;
 
-  void *cpy;
-  err = js_create_arraybuffer(env, &cpy, len, result);
-  if (err != 0) return err;
-
-  memcpy(cpy, data, len);
-  free(data);
-
-  return 0;
+  return js_create_arraybuffer(env, data, len, result);
 }
 
 static void
@@ -1185,11 +1178,13 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
     err = js_open_handle_scope(env, &scope);
     assert(err == 0);
 
-    std::vector<js_string_t> errors;
-    errors.reserve(len);
+    js_array_t errors;
+    err = js_create_array(env, len, errors);
+    assert(err == 0);
 
-    std::vector<js_arraybuffer_t> values;
-    values.reserve(len);
+    js_array_t values;
+    err = js_create_array(env, len, values);
+    assert(err == 0);
 
     for (size_t i = 0; i < len; i++) {
       char *error = req->handle.errors[i];
@@ -1200,7 +1195,8 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
         err = js_create_string(env, error, result);
         assert(err == 0);
 
-        errors.push_back(result);
+        err = js_set_element(env, errors, i, result);
+        assert(err == 0);
       } else {
         js_arraybuffer_t result;
 
@@ -1214,7 +1210,8 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
           assert(err == 0);
         }
 
-        values.push_back(result);
+        err = js_set_element(env, values, i, result);
+        assert(err == 0);
       }
     }
 
@@ -1229,15 +1226,7 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
     req->on_read.reset();
     req->ctx.reset();
 
-    js_array_t errors_array;
-    err = js_create_array(env, errors, errors_array);
-    assert(err == 0);
-
-    js_array_t values_array;
-    err = js_create_array(env, values, values_array);
-    assert(err == 0);
-
-    js_call_function_with_checkpoint(env, cb, ctx, errors_array, values_array);
+    js_call_function_with_checkpoint(env, cb, ctx, errors, values);
 
     err = js_close_handle_scope(env, scope);
     assert(err == 0);
