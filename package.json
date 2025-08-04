@@ -8,7 +8,7 @@
   },
   "files": [
     "index.js",
-    "binding.c",
+    "binding.cc",
     "binding.js",
     "CMakeLists.txt",
     "lib",
