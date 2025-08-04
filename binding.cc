@@ -139,7 +139,7 @@ struct rocksdb_native_snapshot_t {
 };
 
 static void
-rocksdb_native__on_free(js_env_t *env, void *data, void *finalize_hint) {
+rocksdb_native__on_free(js_env_t *env, char *data) {
   free(data);
 }
 
@@ -928,9 +928,9 @@ rocksdb_native_iterator_close(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_na
 
 static int
 rocksdb_native_try_create_external_arraybuffer(js_env_t *env, char *data, size_t len, js_arraybuffer_t &result) {
-  // the external arraybuffer api is optional per (https://nodejs.org/api/n-api.html#napi_create_external_arraybuffer)
-  // so provide a fallback that does a std::copy
-  int err = js_create_external_arraybuffer(env, data, len, result);
+  int err;
+
+  err = js_create_external_arraybuffer<rocksdb_native__on_free>(env, data, len, result);
   if (err == 0) return 0;
 
   return js_create_arraybuffer(env, data, len, result);
