@@ -615,37 +615,37 @@ rocksdb_native_column_family_init(
   uint64_t min_blob_size,
   uint64_t blob_file_size,
   bool enable_blob_garbage_collection,
-  uint64_t table_block_size,
-  bool table_cache_index_and_filter_blocks,
-  uint32_t table_format_version,
+  uint64_t block_size,
+  bool cache_index_and_filter_blocks,
+  uint32_t format_version,
   bool optimize_filters_for_memory,
   bool no_block_cache,
   uint32_t filter_policy_type,
   double bits_per_key,
-  int32_t bloom_before_level = 0
+  int32_t bloom_before_level,
+  uint32_t top_level_index_pinning_tier,
+  uint32_t partition_pinning_tier,
+  uint32_t unpartitioned_pinning_tier
 ) {
   int err;
 
   rocksdb_filter_policy_t filter_policy = {rocksdb_filter_policy_type_t(filter_policy_type)};
 
   switch (filter_policy_type) {
-  case rocksdb_bloom_filter_policy: {
+  case rocksdb_bloom_filter_policy:
     filter_policy.bloom = (rocksdb_bloom_filter_options_t) {
       0,
       bits_per_key
     };
-
     break;
-  }
-  case rocksdb_ribbon_filter_policy: {
+
+  case rocksdb_ribbon_filter_policy:
     filter_policy.ribbon = (rocksdb_ribbon_filter_options_t) {
       0,
       bits_per_key,
       bloom_before_level,
     };
-
     break;
-  }
   }
 
   uv_loop_t *loop;
@@ -665,18 +665,21 @@ rocksdb_native_column_family_init(
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
     name,
     {
-      2,
+      3,
       rocksdb_level_compaction,
       enable_blob_files,
       min_blob_size,
       blob_file_size,
       enable_blob_garbage_collection,
-      table_block_size,
-      table_cache_index_and_filter_blocks,
-      table_format_version,
+      block_size,
+      cache_index_and_filter_blocks,
+      format_version,
       optimize_filters_for_memory,
       no_block_cache,
       filter_policy,
+      rocksdb_pinning_tier_t(top_level_index_pinning_tier),
+      rocksdb_pinning_tier_t(partition_pinning_tier),
+      rocksdb_pinning_tier_t(unpartitioned_pinning_tier),
     }
   };
 
