@@ -41,6 +41,7 @@
     "refcounter": "^1.0.0",
     "require-addon": "^1.0.2",
     "resolve-reject-promise": "^1.1.0",
+    "signal-promise": "^1.0.3",
     "streamx": "^2.16.1"
   },
   "devDependencies": {
