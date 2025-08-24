@@ -895,6 +895,7 @@ test('suspend + write + resume + suspend before fully resumed', async (t) => {
   })
 
   db.resume()
+  await 1 // give it time to tick
   await db.suspend()
 
   await wait(250)
