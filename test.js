@@ -840,6 +840,26 @@ test('suspend + read', async (t) => {
   await db.close()
 })
 
+test('resume + resume + suspend + resume', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await wait(250)
+
+  await db.resume()
+  await db.resume()
+
+  await db.suspend()
+  await db.resume()
+
+  const batch = db.write()
+  batch.tryPut('hello', 'world')
+  await batch.flush()
+  batch.destroy()
+
+  await db.close()
+})
+
 test('suspend + write', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
