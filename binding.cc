@@ -95,7 +95,6 @@ struct rocksdb_native_iterator_t {
   js_persistent_t<cb_on_iterator_read_t> on_read;
 
   bool active;
-  bool closing;
   bool exiting;
 
   js_deferred_teardown_t *teardown;
@@ -719,7 +718,6 @@ rocksdb_native_iterator_init(js_env_t *env) {
 
   req->env = env;
   req->active = false;
-  req->closing = false;
   req->exiting = false;
   req->handle.data = req;
 
@@ -855,7 +853,7 @@ rocksdb_native__on_iterator_teardown(js_deferred_teardown_t *handle, void *data)
 
   req->exiting = true;
 
-  if (req->active || req->closing) return;
+  if (req->active) return;
 
   err = rocksdb_iterator_close(&req->handle, rocksdb_native__on_iterator_close);
   assert(err == 0);
@@ -932,7 +930,6 @@ rocksdb_native_iterator_close(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_na
   int err;
 
   req->active = true;
-  req->closing = true;
 
   err = rocksdb_iterator_close(&req->handle, rocksdb_native__on_iterator_close);
   assert(err == 0);
