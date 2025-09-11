@@ -23,6 +23,7 @@ using cb_on_iterator_read_t = js_function_t<
   std::optional<js_string_t>,
   std::vector<js_arraybuffer_t>,
   std::vector<js_arraybuffer_t>>;
+using cb_on_compact_range_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
 }; // namespace
 
 struct rocksdb_native_column_family_t {
@@ -136,6 +137,14 @@ struct rocksdb_native_flush_t {
 
 struct rocksdb_native_snapshot_t {
   rocksdb_snapshot_t handle;
+};
+
+struct rocksdb_native_compact_range_t {
+  rocksdb_compact_range_t handle;
+
+  js_env_t *env;
+  js_persistent_t<js_receiver_t> ctx;
+  js_persistent_t<cb_on_compact_range_t> on_compact_range;
 };
 
 static void
@@ -1514,6 +1523,97 @@ rocksdb_native_snapshot_destroy(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_
   rocksdb_snapshot_destroy(&snapshot->handle);
 }
 
+static void
+rocksdb_native__on_compact_range(rocksdb_compact_range_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  rocksdb_native_compact_range_t *req = (rocksdb_native_compact_range_t *) handle->data;
+
+  rocksdb_native_t *db = (rocksdb_native_t *) req->handle.req.db;
+
+  js_env_t *env = req->env;
+
+  if (db->exiting) {
+    req->on_compact_range.reset();
+    req->ctx.reset();
+  } else {
+    js_handle_scope_t *scope;
+    err = js_open_handle_scope(env, &scope);
+    assert(err == 0);
+
+    std::optional<js_string_t> error;
+
+    if (req->handle.error) {
+      err = js_create_string(env, req->handle.error, error.emplace());
+      assert(err == 0);
+    }
+
+    js_receiver_t ctx;
+    err = js_get_reference_value(env, req->ctx, ctx);
+    assert(err == 0);
+
+    cb_on_compact_range_t cb;
+    err = js_get_reference_value(env, req->on_compact_range, cb);
+    assert(err == 0);
+
+    req->on_compact_range.reset();
+    req->ctx.reset();
+
+    js_call_function_with_checkpoint(env, cb, ctx, error);
+
+    err = js_close_handle_scope(env, scope);
+    assert(err == 0);
+  }
+}
+
+static js_arraybuffer_t
+rocksdb_native_compact_range(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
+  js_typedarray_t<> start,
+  js_typedarray_t<> end,
+  bool exclusive,
+  js_receiver_t ctx,
+  cb_on_compact_range_t on_compact_range
+) {
+  int err;
+
+  js_arraybuffer_t handle;
+
+  rocksdb_native_compact_range_t *req;
+  err = js_create_arraybuffer(env, req, handle);
+  assert(err == 0);
+
+  req->env = env;
+  req->handle.data = (void *) req;
+
+  err = js_create_reference(env, ctx, req->ctx);
+  assert(err == 0);
+
+  err = js_create_reference(env, on_compact_range, req->on_compact_range);
+  assert(err == 0);
+
+  rocksdb_compact_range_options_t options = {
+    .version = 0,
+    .exclusive_manual_compaction = exclusive
+  };
+
+  rocksdb_slice_t start_slice;
+  err = js_get_typedarray_info(env, start, start_slice.data, start_slice.len);
+  assert(err == 0);
+
+  rocksdb_slice_t end_slice;
+  err = js_get_typedarray_info(env, start, end_slice.data, end_slice.len);
+  assert(err == 0);
+
+  err = rocksdb_compact_range(&db->handle, &req->handle, start_slice, end_slice, &options, rocksdb_native__on_compact_range);
+  assert(err == 0);
+
+  return handle;
+}
+
 static js_value_t *
 rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   int err;
@@ -1549,6 +1649,8 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
 
   V("snapshotCreate", rocksdb_native_snapshot_create)
   V("snapshotDestroy", rocksdb_native_snapshot_destroy)
+
+  V("compactRange", rocksdb_native_compact_range)
 #undef V
 
 #define V(name, n) \
