@@ -1572,6 +1572,7 @@ static js_arraybuffer_t
 rocksdb_native_compact_range(
   js_env_t *env,
   js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
+  js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family,
   js_typedarray_t<> start,
   js_typedarray_t<> end,
   bool exclusive,
@@ -1608,7 +1609,7 @@ rocksdb_native_compact_range(
   err = js_get_typedarray_info(env, start, end_slice.data, end_slice.len);
   assert(err == 0);
 
-  err = rocksdb_compact_range(&db->handle, &req->handle, start_slice, end_slice, &options, rocksdb_native__on_compact_range);
+  err = rocksdb_compact_range(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, &options, rocksdb_native__on_compact_range);
   assert(err == 0);
 
   return handle;
