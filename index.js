@@ -1,6 +1,5 @@
 const ColumnFamily = require('./lib/column-family')
 const Iterator = require('./lib/iterator')
-const ManualCompaction = require('./lib/manual-compaction')
 const Snapshot = require('./lib/snapshot')
 const State = require('./lib/state')
 const { BloomFilterPolicy, RibbonFilterPolicy } = require('./lib/filter-policy')
@@ -177,7 +176,7 @@ class RocksDB {
     await batch.flush()
   }
 
-  async compactRange(start, end, opts = {}) {
+  async compactRange(start = null, end = null, opts = {}) {
     if (typeof end === 'object' && end !== null) {
       opts = end
       end = null
@@ -187,7 +186,7 @@ class RocksDB {
       end = null
     }
 
-    await new ManualCompaction(this, opts).compactRange(start, end)
+    await this._state.compactRange(this, start, end, opts)
   }
 
   _ref() {

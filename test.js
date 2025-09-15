@@ -329,7 +329,7 @@ test('manual compaction', async (t) => {
   batch.destroy()
 
   await db.compactRange('ab', 'bb')
-  await db.compactRange('bb')
+  await db.compactRange('bb', { exclusive: true })
   await db.compactRange()
 
   t.pass()
