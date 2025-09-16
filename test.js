@@ -315,6 +315,28 @@ test('key iterator', async (t) => {
   await db.close()
 })
 
+test('manual compaction', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ba', 'ba')
+  batch.put('bb', 'bb')
+  batch.put('ac', 'ac')
+  await batch.flush()
+  batch.destroy()
+
+  await db.compactRange('ab', 'bb')
+  await db.compactRange('bb', { exclusive: true })
+  await db.compactRange()
+
+  t.pass()
+
+  await db.close()
+})
+
 test('prefix iterator, reverse', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()

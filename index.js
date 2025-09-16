@@ -176,6 +176,19 @@ class RocksDB {
     await batch.flush()
   }
 
+  async compactRange(start = null, end = null, opts = {}) {
+    if (typeof end === 'object' && end !== null) {
+      opts = end
+      end = null
+    } else if (typeof start === 'object' && start !== null) {
+      opts = start
+      start = null
+      end = null
+    }
+
+    await this._state.compactRange(this, start, end, opts)
+  }
+
   _ref() {
     if (this._snapshot) this._snapshot.ref()
     this._state.handles.inc()
