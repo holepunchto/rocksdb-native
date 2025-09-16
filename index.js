@@ -189,6 +189,10 @@ class RocksDB {
     await this._state.compactRange(this, start, end, opts)
   }
 
+  async approximateSize(start, end) {
+    return this._state.approximateSize(this, start, end)
+  }
+
   _ref() {
     if (this._snapshot) this._snapshot.ref()
     this._state.handles.inc()

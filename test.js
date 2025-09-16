@@ -337,6 +337,26 @@ test('manual compaction', async (t) => {
   await db.close()
 })
 
+test('approximate size', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ba', 'ba')
+  batch.put('bb', 'bb')
+  batch.put('ac', 'ac')
+  await batch.flush()
+  batch.destroy()
+
+  const result = await db.approximateSize('aa', 'bb')
+
+  t.is(result, 56)
+
+  await db.close()
+})
+
 test('prefix iterator, reverse', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
