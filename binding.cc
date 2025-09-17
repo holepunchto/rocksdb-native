@@ -1676,6 +1676,8 @@ rocksdb_native_approximate_size(
   js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family,
   js_typedarray_t<> start,
   js_typedarray_t<> end,
+  bool include_files,
+  double error_margin,
   js_receiver_t ctx,
   cb_on_approximate_size_t on_approximate_size
 ) {
@@ -1696,6 +1698,12 @@ rocksdb_native_approximate_size(
   err = js_create_reference(env, on_approximate_size, req->on_approximate_size);
   assert(err == 0);
 
+  rocksdb_approximate_size_options_t options = {
+    .version = 0,
+    .include_files = include_files,
+    .files_size_error_margin = error_margin,
+  };
+
   rocksdb_slice_t start_slice;
   err = js_get_typedarray_info(env, start, start_slice.data, start_slice.len);
   assert(err == 0);
@@ -1704,7 +1712,7 @@ rocksdb_native_approximate_size(
   err = js_get_typedarray_info(env, end, end_slice.data, end_slice.len);
   assert(err == 0);
 
-  err = rocksdb_approximate_size(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, rocksdb_native__on_approximate_size);
+  err = rocksdb_approximate_size(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, &options, rocksdb_native__on_approximate_size);
   assert(err == 0);
 
   return handle;

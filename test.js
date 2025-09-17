@@ -350,7 +350,7 @@ test('approximate size', async (t) => {
   await batch.flush()
   batch.destroy()
 
-  const result = await db.approximateSize('aa', 'bb')
+  const result = await db.approximateSize('aa', 'bb', { includeFiles: false })
 
   t.is(result, 56)
 
