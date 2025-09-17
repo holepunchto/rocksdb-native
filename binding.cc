@@ -1606,7 +1606,7 @@ rocksdb_native_compact_range(
   assert(err == 0);
 
   rocksdb_slice_t end_slice;
-  err = js_get_typedarray_info(env, start, end_slice.data, end_slice.len);
+  err = js_get_typedarray_info(env, end, end_slice.data, end_slice.len);
   assert(err == 0);
 
   err = rocksdb_compact_range(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, &options, rocksdb_native__on_compact_range);
