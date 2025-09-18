@@ -1676,6 +1676,7 @@ rocksdb_native_approximate_size(
   js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family,
   js_typedarray_t<> start,
   js_typedarray_t<> end,
+  bool include_memtables,
   bool include_files,
   double error_margin,
   js_receiver_t ctx,
@@ -1700,6 +1701,7 @@ rocksdb_native_approximate_size(
 
   rocksdb_approximate_size_options_t options = {
     .version = 0,
+    .include_memtables = include_memtables,
     .include_files = include_files,
     .files_size_error_margin = error_margin,
   };

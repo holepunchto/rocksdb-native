@@ -338,6 +338,8 @@ test('manual compaction', async (t) => {
 })
 
 test('approximate size', async (t) => {
+  t.plan(2)
+
   const db = new RocksDB(await t.tmp())
   await db.ready()
 
@@ -350,9 +352,23 @@ test('approximate size', async (t) => {
   await batch.flush()
   batch.destroy()
 
-  const result = await db.approximateSize('aa', 'bb', { includeFiles: false })
+  {
+    const result = await db.approximateSize('aa', 'bb', {
+      includeMemtables: true,
+      includeFiles: true
+    })
 
-  t.is(result, 56)
+    t.ok(result > 0)
+  }
+
+  {
+    await t.exception(async () => {
+      await db.approximateSize('aa', 'bb', {
+        includeMemtables: false,
+        includeFiles: false
+      })
+    }, /Invalid options/)
+  }
 
   await db.close()
 })
