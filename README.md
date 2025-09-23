@@ -6,6 +6,9 @@
 npm i rocksdb-native
 ```
 
+> [!IMPORTANT]
+> On Linux `libatomic` must be installed as well.
+
 ## Usage
 
 ```js
