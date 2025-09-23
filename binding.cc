@@ -328,7 +328,11 @@ rocksdb_native_init(
   int32_t max_background_jobs,
   uint64_t bytes_per_sync,
   int32_t max_open_files,
-  bool use_direct_reads
+  bool use_direct_reads,
+  bool avoid_unnecessary_blocking_io,
+  bool skip_stats_update_on_db_open,
+  bool use_direct_io_for_flush_and_compaction,
+  int32_t max_file_opening_threads
 ) {
   int err;
 
@@ -354,7 +358,11 @@ rocksdb_native_init(
     max_background_jobs,
     bytes_per_sync,
     max_open_files,
-    use_direct_reads
+    use_direct_reads,
+    avoid_unnecessary_blocking_io,
+    skip_stats_update_on_db_open,
+    use_direct_io_for_flush_and_compaction,
+    max_file_opening_threads
   };
 
   err = rocksdb_init(loop, &db->handle);
@@ -643,7 +651,10 @@ rocksdb_native_column_family_init(
   int32_t bloom_before_level,
   uint32_t top_level_index_pinning_tier,
   uint32_t partition_pinning_tier,
-  uint32_t unpartitioned_pinning_tier
+  uint32_t unpartitioned_pinning_tier,
+  bool optimize_filters_for_hits,
+  int32_t num_levels,
+  int32_t max_write_buffer_number
 ) {
   int err;
 
@@ -698,6 +709,9 @@ rocksdb_native_column_family_init(
       rocksdb_pinning_tier_t(top_level_index_pinning_tier),
       rocksdb_pinning_tier_t(partition_pinning_tier),
       rocksdb_pinning_tier_t(unpartitioned_pinning_tier),
+      optimize_filters_for_hits,
+      num_levels,
+      max_write_buffer_number
     }
   };
 
@@ -1187,6 +1201,8 @@ rocksdb_native_read(
   js_arraybuffer_span_of_t<rocksdb_native_read_batch_t, 1> req,
   js_array_t operations,
   std::optional<js_arraybuffer_t> snapshot,
+  bool async_io,
+  bool fill_cache,
   js_receiver_t ctx,
   cb_on_read_t on_read
 ) {
@@ -1242,6 +1258,8 @@ rocksdb_native_read(
 
   rocksdb_read_options_t options = {
     .version = 0,
+    .async_io = async_io,
+    .fill_cache = fill_cache
   };
 
   if (snapshot) {
