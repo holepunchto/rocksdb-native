@@ -17,10 +17,11 @@
   ],
   "addon": true,
   "scripts": {
+    "format": "prettier --write .",
+    "lint": "prettier --check .",
     "test": "npm run lint && npm run test:bare && npm run test:node",
     "test:bare": "bare test.js",
-    "test:node": "node test.js",
-    "lint": "prettier . --check"
+    "test:node": "node test.js"
   },
   "repository": {
     "type": "git",
@@ -50,7 +51,7 @@
     "cmake-bare": "^1.1.14",
     "cmake-fetch": "^1.0.1",
     "cmake-napi": "^1.0.6",
-    "prettier": "^3.4.1",
-    "prettier-config-standard": "^7.0.0"
+    "prettier": "^3.6.2",
+    "prettier-config-holepunch": "^1.0.0"
   }
 }
