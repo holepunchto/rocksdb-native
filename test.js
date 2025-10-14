@@ -388,10 +388,7 @@ test('prefix iterator, reverse', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator(
-    { gte: 'a', lt: 'b' },
-    { reverse: true }
-  )) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { reverse: true })) {
     entries.push(entry)
   }
 
@@ -419,10 +416,7 @@ test('prefix iterator, reverse with limit', async (t) => {
 
   const entries = []
 
-  for await (const entry of db.iterator(
-    { gte: 'a', lt: 'b' },
-    { reverse: true, limit: 1 }
-  )) {
+  for await (const entry of db.iterator({ gte: 'a', lt: 'b' }, { reverse: true, limit: 1 })) {
     entries.push(entry)
   }
 

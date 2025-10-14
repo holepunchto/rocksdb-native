@@ -213,6 +213,5 @@ exports.BloomFilterPolicy = BloomFilterPolicy
 exports.RibbonFilterPolicy = RibbonFilterPolicy
 
 function maybeClosed(db) {
-  if (db._state.closing || db._index === -1)
-    throw new Error('RocksDB session is closed')
+  if (db._state.closing || db._index === -1) throw new Error('RocksDB session is closed')
 }
