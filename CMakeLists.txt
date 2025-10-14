@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 4.0)
 
 find_package(cmake-bare REQUIRED PATHS node_modules/cmake-bare)
 find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
@@ -9,8 +9,8 @@ project(rocksdb_native C CXX)
 
 bare_target(target)
 
-fetch_package("github:holepunchto/librocksdb#bf9c031")
-fetch_package("github:holepunchto/libjstl#34a7894")
+fetch_package("github:holepunchto/librocksdb#3aaa9dc")
+fetch_package("github:holepunchto/libjstl#098664c")
 
 add_bare_module(rocksdb_native_bare)
 
