@@ -155,6 +155,21 @@ rocksdb_native__on_free(js_env_t *env, char *data) {
   free(data);
 }
 
+static int
+rocksdb_native__try_create_external_arraybuffer(js_env_t *env, char *data, size_t len, js_arraybuffer_t &result) {
+  int err;
+
+  err = js_create_external_arraybuffer<rocksdb_native__on_free>(env, data, len, result);
+  if (err == 0) return 0;
+
+  err = js_create_arraybuffer(env, data, len, result);
+  assert(err == 0);
+
+  free(data);
+
+  return 0;
+}
+
 static void
 rocksdb_native__on_column_family_teardown(void *data);
 
@@ -1001,16 +1016,6 @@ rocksdb_native_iterator_close(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_na
   req->active = true;
 }
 
-static int
-rocksdb_native_try_create_external_arraybuffer(js_env_t *env, char *data, size_t len, js_arraybuffer_t &result) {
-  int err;
-
-  err = js_create_external_arraybuffer<rocksdb_native__on_free>(env, data, len, result);
-  if (err == 0) return 0;
-
-  return js_create_arraybuffer(env, data, len, result);
-}
-
 static void
 rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
   int err;
@@ -1070,14 +1075,14 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
 
         rocksdb_slice_t *key = &req->keys[i];
 
-        err = rocksdb_native_try_create_external_arraybuffer(env, const_cast<char *>(key->data), key->len, result);
+        err = rocksdb_native__try_create_external_arraybuffer(env, const_cast<char *>(key->data), key->len, result);
         assert(err == 0);
 
         keys.push_back(result);
 
         rocksdb_slice_t *value = &req->values[i];
 
-        err = rocksdb_native_try_create_external_arraybuffer(env, const_cast<char *>(value->data), value->len, result);
+        err = rocksdb_native__try_create_external_arraybuffer(env, const_cast<char *>(value->data), value->len, result);
         assert(err == 0);
 
         values.push_back(result);
@@ -1207,7 +1212,7 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
           err = js_get_null(env, static_cast<js_value_t **>(result));
           assert(err == 0);
         } else {
-          err = rocksdb_native_try_create_external_arraybuffer(env, const_cast<char *>(slice->data), slice->len, result);
+          err = rocksdb_native__try_create_external_arraybuffer(env, const_cast<char *>(slice->data), slice->len, result);
           assert(err == 0);
         }
 
