@@ -207,7 +207,7 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 
     rocksdb_column_family_t **handles = handle->handles;
 
-    if (req->handle.error == NULL) {
+    if (req->handle.error == nullptr) {
       std::vector<js_arraybuffer_t> elements;
       err = js_get_array_elements(env, column_families, elements);
       assert(err == 0);
@@ -710,8 +710,8 @@ rocksdb_native_column_family_init(
   assert(err == 0);
 
   column_family->env = env;
-  column_family->db = NULL;
-  column_family->handle = NULL;
+  column_family->db = nullptr;
+  column_family->handle = nullptr;
 
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
     name,
@@ -747,7 +747,7 @@ rocksdb_native_column_family_destroy(
 ) {
   int err;
 
-  if (column_family->handle == NULL) return;
+  if (column_family->handle == nullptr) return;
 
   err = rocksdb_column_family_destroy(column_family->db, column_family->handle);
   assert(err == 0);
@@ -757,7 +757,7 @@ rocksdb_native_column_family_destroy(
 
   column_family->ctx.reset();
 
-  column_family->handle = NULL;
+  column_family->handle = nullptr;
 }
 
 static js_arraybuffer_t
@@ -1026,7 +1026,7 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
   size_t len = req->handle.len;
 
   if (db->exiting) {
-    if (status == 0 && req->handle.error == NULL) {
+    if (status == 0 && req->handle.error == nullptr) {
       for (size_t i = 0; i < len; i++) {
         js_value_t *result;
 
@@ -1203,8 +1203,8 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
 
         rocksdb_slice_t *slice = &req->reads[i].value;
 
-        if (slice->data == NULL && slice->len == (size_t) -1) {
-          err = js_get_null(env, (js_value_t **) result);
+        if (slice->data == nullptr && slice->len == size_t(-1)) {
+          err = js_get_null(env, static_cast<js_value_t **>(result));
           assert(err == 0);
         } else {
           err = rocksdb_native_try_create_external_arraybuffer(env, const_cast<char *>(slice->data), slice->len, result);
@@ -1487,7 +1487,7 @@ rocksdb_native_write(
     }
   }
 
-  err = rocksdb_write(&db->handle, &req->handle, req->writes, len, NULL, rocksdb_native__on_write);
+  err = rocksdb_write(&db->handle, &req->handle, req->writes, len, nullptr, rocksdb_native__on_write);
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
@@ -1567,7 +1567,7 @@ rocksdb_native_flush(
   req->env = env;
   req->handle.data = req;
 
-  err = rocksdb_flush(&db->handle, &req->handle, column_family->handle, NULL, rocksdb_native__on_flush);
+  err = rocksdb_flush(&db->handle, &req->handle, column_family->handle, nullptr, rocksdb_native__on_flush);
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
