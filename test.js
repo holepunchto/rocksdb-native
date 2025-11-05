@@ -1009,6 +1009,28 @@ test('iterator + suspend + close', async (t) => {
   await t.exception(p)
 })
 
+test('iterator + suspend + resume while reading', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('hello', 'world')
+  await batch.flush()
+  batch.destroy()
+
+  const entries = []
+
+  for await (const entry of db.iterator({ gte: 'hello', lt: 'z' })) {
+    await db.suspend()
+    entries.push(entry)
+    await db.resume()
+  }
+
+  t.alike(entries, [{ key: Buffer.from('hello'), value: Buffer.from('world') }])
+
+  await db.close()
+})
+
 test('make a batch, queue read, destroy + suspend + close', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
