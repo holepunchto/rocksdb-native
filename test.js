@@ -8,6 +8,11 @@ test('open + close', async (t) => {
   await db.close()
 })
 
+test('create + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.close()
+})
+
 test('write + read', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()

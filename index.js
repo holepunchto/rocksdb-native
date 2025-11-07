@@ -79,6 +79,8 @@ class RocksDB {
   }
 
   async close({ force } = {}) {
+    if (!this._state.opened) await this._state.ready()
+
     if (this._index !== -1) this._state.removeSession(this)
 
     if (force) {
