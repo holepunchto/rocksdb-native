@@ -1790,6 +1790,13 @@ rocksdb_native_approximate_size(
   return handle;
 }
 
+static void
+rocksdb_native__on_snapshot_teardown(void *data) {
+  auto snapshot = reinterpret_cast<rocksdb_native_snapshot_t *>(data);
+
+  rocksdb_snapshot_destroy(&snapshot->handle);
+}
+
 static js_arraybuffer_t
 rocksdb_native_snapshot_create(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_t, 1> db) {
   int err;
@@ -1809,12 +1816,20 @@ rocksdb_native_snapshot_create(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_n
     throw js_pending_exception;
   }
 
+  err = js_add_teardown_callback(env, rocksdb_native__on_snapshot_teardown, snapshot);
+  assert(err == 0);
+
   return handle;
 }
 
 static void
 rocksdb_native_snapshot_destroy(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_snapshot_t, 1> snapshot) {
+  int err;
+
   rocksdb_snapshot_destroy(&snapshot->handle);
+
+  err = js_remove_teardown_callback(env, rocksdb_native__on_snapshot_teardown, snapshot);
+  assert(err == 0);
 }
 
 static js_value_t *
