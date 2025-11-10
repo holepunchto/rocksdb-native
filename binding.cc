@@ -359,7 +359,7 @@ rocksdb_native_init(
   db->exiting = false;
 
   db->options = (rocksdb_options_t) {
-    1,
+    3,
     read_only,
     create_if_missing,
     create_missing_column_families,
@@ -370,7 +370,8 @@ rocksdb_native_init(
     avoid_unnecessary_blocking_io,
     skip_stats_update_on_db_open,
     use_direct_io_for_flush_and_compaction,
-    max_file_opening_threads
+    max_file_opening_threads,
+    -1,
   };
 
   err = rocksdb_init(loop, &db->handle);
@@ -392,6 +393,7 @@ rocksdb_native_open(
   js_receiver_t self,
   char *path,
   js_array_t column_families_array,
+  int lock,
   js_receiver_t ctx,
   rocksdb_native_on_open_t on_open
 ) {
@@ -428,11 +430,19 @@ rocksdb_native_open(
   req->env = env;
   req->handle.data = req;
 
+  db->options.lock = lock;
+
   err = rocksdb_open(&db->handle, &req->handle, path, &db->options, column_families, handles, len, rocksdb_native__on_open);
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
     assert(err == 0);
+
+    if (lock >= 0) {
+      uv_fs_t fs;
+      err = uv_fs_close(NULL, &fs, lock, NULL);
+      assert(err == 0);
+    }
 
     throw js_pending_exception;
   }
@@ -1295,7 +1305,7 @@ rocksdb_native_read(
   }
 
   rocksdb_read_options_t options = {
-    .version = 0,
+    .version = 1,
     .async_io = async_io,
     .fill_cache = fill_cache
   };

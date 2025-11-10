@@ -6,6 +6,10 @@
     ".": "./index.js",
     "./package": "./package.json"
   },
+  "imports": {
+    "fs": "bare-fs",
+    "default": "fs"
+  },
   "files": [
     "index.js",
     "binding.cc",
@@ -47,10 +51,12 @@
   },
   "devDependencies": {
     "bare-compat-napi": "^1.3.0",
+    "bare-fs": "^4.5.0",
     "brittle": "^3.5.0",
     "cmake-bare": "^1.1.14",
     "cmake-fetch": "^1.0.1",
     "cmake-napi": "^1.0.6",
+    "fd-lock": "^2.0.0",
     "prettier": "^3.6.2",
     "prettier-config-holepunch": "^2.0.0"
   }
