@@ -8,12 +8,6 @@
 #include <utf.h>
 #include <uv.h>
 
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
-
 using rocksdb_native_on_open_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
 using rocksdb_native_on_close_t = js_function_t<void, js_receiver_t>;
 using rocksdb_native_on_suspend_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
@@ -40,8 +34,6 @@ struct rocksdb_native_column_family_t {
 struct rocksdb_native_t {
   rocksdb_t handle;
   rocksdb_options_t options;
-
-  int lock;
 
   js_env_t *env;
   js_persistent_t<js_receiver_t> ctx;
@@ -276,7 +268,6 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
 
   auto env = req->env;
 
-  auto lock = db->lock;
   auto teardown = db->teardown;
 
   if (db->exiting) {
@@ -309,14 +300,6 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
 
     err = js_close_handle_scope(env, scope);
     assert(err == 0);
-  }
-
-  if (lock != -1) {
-#ifdef _WIN32
-    _close(lock);
-#else
-    close(lock);
-#endif
   }
 
   err = js_finish_deferred_teardown_callback(teardown);
@@ -357,8 +340,7 @@ rocksdb_native_init(
   bool avoid_unnecessary_blocking_io,
   bool skip_stats_update_on_db_open,
   bool use_direct_io_for_flush_and_compaction,
-  int32_t max_file_opening_threads,
-  int32_t lock
+  int32_t max_file_opening_threads
 ) {
   int err;
 
@@ -373,12 +355,11 @@ rocksdb_native_init(
   assert(err == 0);
 
   db->env = env;
-  db->lock = lock;
   db->closing = false;
   db->exiting = false;
 
   db->options = (rocksdb_options_t) {
-    1,
+    3,
     read_only,
     create_if_missing,
     create_missing_column_families,
@@ -389,7 +370,8 @@ rocksdb_native_init(
     avoid_unnecessary_blocking_io,
     skip_stats_update_on_db_open,
     use_direct_io_for_flush_and_compaction,
-    max_file_opening_threads
+    max_file_opening_threads,
+    -1,
   };
 
   err = rocksdb_init(loop, &db->handle);
@@ -411,6 +393,7 @@ rocksdb_native_open(
   js_receiver_t self,
   char *path,
   js_array_t column_families_array,
+  int lock,
   js_receiver_t ctx,
   rocksdb_native_on_open_t on_open
 ) {
@@ -447,11 +430,19 @@ rocksdb_native_open(
   req->env = env;
   req->handle.data = req;
 
+  db->options.lock = lock;
+
   err = rocksdb_open(&db->handle, &req->handle, path, &db->options, column_families, handles, len, rocksdb_native__on_open);
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
     assert(err == 0);
+
+    if (lock >= 0) {
+      uv_fs_t fs;
+      err = uv_fs_close(NULL, &fs, lock, NULL);
+      assert(err == 0);
+    }
 
     throw js_pending_exception;
   }
@@ -1314,7 +1305,7 @@ rocksdb_native_read(
   }
 
   rocksdb_read_options_t options = {
-    .version = 0,
+    .version = 1,
     .async_io = async_io,
     .fill_cache = fill_cache
   };

@@ -1,5 +1,7 @@
 const test = require('brittle')
+const fs = require('fs')
 const c = require('compact-encoding')
+const FDLock = require('fd-lock')
 const RocksDB = require('.')
 
 test('open + close', async (t) => {
@@ -1125,6 +1127,45 @@ test('suspend + flush + resume', async (t) => {
   t.pass()
 
   await db.close()
+})
+
+test('fd lock', async (t) => {
+  const fd = fs.openSync('test/fixtures/lock', 'w+')
+
+  const lock = new FDLock(fd)
+
+  const db = new RocksDB(await t.tmp(), { lock })
+  await db.ready()
+  await db.close()
+
+  await t.exception(() => fs.fstatSync(fd), /EBADF/)
+})
+
+test('fd lock + suspend + resume', async (t) => {
+  const fd = fs.openSync('test/fixtures/lock', 'w+')
+
+  const lock = new FDLock(fd)
+
+  const db = new RocksDB(await t.tmp(), { lock })
+  await db.ready()
+  await db.suspend()
+  await db.resume()
+  await db.close()
+
+  await t.exception(() => fs.fstatSync(fd), /EBADF/)
+})
+
+test('fd lock + suspend + close', async (t) => {
+  const fd = fs.openSync('test/fixtures/lock', 'w+')
+
+  const lock = new FDLock(fd)
+
+  const db = new RocksDB(await t.tmp(), { lock })
+  await db.ready()
+  await db.suspend()
+  await db.close()
+
+  await t.exception(() => fs.fstatSync(fd), /EBADF/)
 })
 
 function noop() {}

@@ -9,7 +9,7 @@ project(rocksdb_native C CXX)
 
 bare_target(target)
 
-fetch_package("github:holepunchto/librocksdb#1fa9c8c")
+fetch_package("github:holepunchto/librocksdb#53aeaf4")
 fetch_package("github:holepunchto/libjstl#098664c")
 
 add_bare_module(rocksdb_native_bare)
