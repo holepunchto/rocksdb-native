@@ -271,14 +271,14 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
   auto teardown = db->teardown;
 
   if (db->exiting) {
-    db->ctx.reset();
-
     if (db->closing) {
       req->on_close.reset();
       req->ctx.reset();
     } else {
       free(req);
     }
+
+    db->ctx.reset();
   } else {
     js_handle_scope_t *scope;
     err = js_open_handle_scope(env, &scope);
@@ -292,9 +292,10 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
     err = js_get_reference_value(env, req->on_close, cb);
     assert(err == 0);
 
-    db->ctx.reset();
     req->on_close.reset();
     req->ctx.reset();
+
+    db->ctx.reset();
 
     js_call_function_with_checkpoint(env, cb, ctx);
 
