@@ -277,7 +277,7 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
     column_family->ctx.reset();
   }
 
-  db->column_families.clear();
+  db->column_families.~set();
 
   for (auto &snapshot : db->snapshots) {
     rocksdb_snapshot_destroy(&snapshot->handle);
@@ -285,7 +285,7 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
     snapshot->ctx.reset();
   }
 
-  db->snapshots.clear();
+  db->snapshots.~set();
 }
 
 static void
