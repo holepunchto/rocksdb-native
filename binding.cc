@@ -391,8 +391,8 @@ rocksdb_native_init(
   db->closing = false;
   db->exiting = false;
 
-  db->column_families = std::set<rocksdb_native_column_family_t *>();
-  db->snapshots = std::set<rocksdb_native_snapshot_t *>();
+  new (&db->column_families) std::set<rocksdb_native_column_family_t *>();
+  new (&db->snapshots) std::set<rocksdb_native_snapshot_t *>();
 
   db->options = (rocksdb_options_t) {
     3,
