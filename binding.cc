@@ -298,31 +298,35 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
 
   auto teardown = db->teardown;
 
-  js_handle_scope_t *scope;
-  err = js_open_handle_scope(env, &scope);
-  assert(err == 0);
+  if (db->closing) {
+    js_handle_scope_t *scope;
+    err = js_open_handle_scope(env, &scope);
+    assert(err == 0);
 
-  js_receiver_t ctx;
-  err = js_get_reference_value(env, req->ctx, ctx);
-  assert(err == 0);
+    js_receiver_t ctx;
+    err = js_get_reference_value(env, req->ctx, ctx);
+    assert(err == 0);
 
-  rocksdb_native_on_close_t cb;
-  err = js_get_reference_value(env, req->on_close, cb);
-  assert(err == 0);
+    rocksdb_native_on_close_t cb;
+    err = js_get_reference_value(env, req->on_close, cb);
+    assert(err == 0);
 
-  req->on_close.reset();
-  req->self.reset();
-  req->ctx.reset();
+    req->on_close.reset();
+    req->self.reset();
+    req->ctx.reset();
 
-  db->ctx.reset();
+    if (!db->exiting) {
+      err = js_call_function_with_checkpoint(env, cb, ctx);
+      (void) err;
+    }
 
-  if (!db->exiting) {
-    err = js_call_function_with_checkpoint(env, cb, ctx);
-    (void) err;
+    err = js_close_handle_scope(env, scope);
+    assert(err == 0);
+  } else {
+    delete req;
   }
 
-  err = js_close_handle_scope(env, scope);
-  assert(err == 0);
+  db->ctx.reset();
 
   err = js_finish_deferred_teardown_callback(teardown);
   assert(err == 0);
@@ -340,40 +344,12 @@ rocksdb_native__on_teardown(js_deferred_teardown_t *teardown, void *data) {
 
   auto env = db->env;
 
-  js_handle_scope_t *scope;
-  err = js_open_handle_scope(env, &scope);
-  assert(err == 0);
-
-  js_arraybuffer_t handle;
-
-  rocksdb_native_close_t *req;
-  err = js_create_arraybuffer(env, req, handle);
-  assert(err == 0);
+  auto req = new rocksdb_native_close_t();
 
   req->env = env;
   req->handle.data = req;
 
   err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_idle, rocksdb_native__on_close);
-  assert(err == 0);
-
-  js_receiver_t ctx;
-  err = js_get_null(env, static_cast<js_value_t **>(ctx));
-  assert(err == 0);
-
-  rocksdb_native_on_close_t on_close;
-  err = js_get_null(env, static_cast<js_value_t **>(on_close));
-  assert(err == 0);
-
-  err = js_create_reference(env, ctx, req->ctx);
-  assert(err == 0);
-
-  err = js_create_reference(env, handle, req->self);
-  assert(err == 0);
-
-  err = js_create_reference(env, on_close, req->on_close);
-  assert(err == 0);
-
-  err = js_close_handle_scope(env, scope);
   assert(err == 0);
 }
 
