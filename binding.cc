@@ -1064,8 +1064,6 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
     assert(err == 0);
   } else {
     for (size_t i = 0; i < len; i++) {
-      js_arraybuffer_t result;
-
       rocksdb_slice_t *key = &req->keys[i];
       rocksdb_slice_t *value = &req->values[i];
 
@@ -1073,6 +1071,8 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
         rocksdb_slice_destroy(key);
         rocksdb_slice_destroy(value);
       } else {
+        js_arraybuffer_t result;
+
         err = rocksdb_native__try_create_external_arraybuffer(env, const_cast<char *>(key->data), key->len, result);
         assert(err == 0);
 
@@ -1197,9 +1197,8 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
     } else {
       rocksdb_slice_t *value = &req->reads[i].value;
 
-      if (db->exiting) {
-        rocksdb_slice_destroy(value);
-      } else {
+      if (db->exiting) rocksdb_slice_destroy(value);
+      else {
         js_arraybuffer_t result;
 
         if (value->data == nullptr && value->len == size_t(-1)) {
