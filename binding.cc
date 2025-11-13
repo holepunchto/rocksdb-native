@@ -194,7 +194,6 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
   auto env = req->env;
 
   auto descriptors = handle->column_families;
-
   auto handles = handle->handles;
 
   js_handle_scope_t *scope;
@@ -246,12 +245,15 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
         db->column_families.insert(column_family);
       }
     }
-
-    if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
-
-    err = js_close_handle_scope(env, scope);
-    assert(err == 0);
   }
+
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
+
+  err = js_close_handle_scope(env, scope);
+  assert(err == 0);
 
   delete[] descriptors;
   delete[] handles;
@@ -315,7 +317,10 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
 
   db->ctx.reset();
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -582,7 +587,10 @@ rocksdb_native__on_suspend(rocksdb_suspend_t *handle, int status) {
     assert(err == 0);
   }
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -660,7 +668,10 @@ rocksdb_native__on_resume(rocksdb_resume_t *handle, int status) {
     assert(err == 0);
   }
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -884,7 +895,10 @@ rocksdb_native__on_iterator_close(rocksdb_iterator_t *handle, int status) {
     assert(err == 0);
   }
 
-  if (!req->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
+  if (!req->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -922,7 +936,10 @@ rocksdb_native__on_iterator_open(rocksdb_iterator_t *handle, int status) {
     assert(err == 0);
   }
 
-  if (!req->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
+  if (!req->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -1086,7 +1103,10 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
     }
   }
 
-  if (!req->exiting) js_call_function_with_checkpoint(env, cb, ctx, error, keys, values);
+  if (!req->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error, keys, values);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -1215,7 +1235,10 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
     }
   }
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, errors, values);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, errors, values);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -1370,7 +1393,10 @@ rocksdb_native__on_write(rocksdb_write_batch_t *handle, int status) {
     assert(err == 0);
   }
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -1516,7 +1542,10 @@ rocksdb_native__on_flush(rocksdb_flush_t *handle, int status) {
     assert(err == 0);
   }
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -1593,7 +1622,10 @@ rocksdb_native__on_compact_range(rocksdb_compact_range_t *handle, int status) {
     assert(err == 0);
   }
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, error);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
@@ -1686,7 +1718,10 @@ rocksdb_native__on_approximate_size(rocksdb_approximate_size_t *handle, int stat
     assert(err == 0);
   }
 
-  if (!db->exiting) js_call_function_with_checkpoint(env, cb, ctx, error, req->handle.result);
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error, req->handle.result);
+    (void) err;
+  }
 
   err = js_close_handle_scope(env, scope);
   assert(err == 0);
