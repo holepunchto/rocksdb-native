@@ -274,14 +274,13 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
     column_family->ctx.reset();
   }
 
-  db->column_families.~set();
-
   for (auto &snapshot : db->snapshots) {
     rocksdb_snapshot_destroy(&snapshot->handle);
 
     snapshot->ctx.reset();
   }
 
+  db->column_families.~set();
   db->snapshots.~set();
 }
 
@@ -460,6 +459,8 @@ rocksdb_native_open(
     column_family->db = db;
   }
 
+  auto handles = new rocksdb_column_family_t *[len];
+
   uv_loop_t *loop;
   err = js_get_env_loop(env, &loop);
   assert(err == 0);
@@ -474,8 +475,6 @@ rocksdb_native_open(
   req->handle.data = req;
 
   db->options.lock = lock;
-
-  auto handles = new rocksdb_column_family_t *[len];
 
   err = rocksdb_open(loop, &db->handle, &req->handle, path, &db->options, column_families, handles, len, nullptr, rocksdb_native__on_open);
 
@@ -563,8 +562,6 @@ rocksdb_native__on_suspend(rocksdb_suspend_t *handle, int status) {
 
   auto env = req->env;
 
-  auto teardown = db->teardown;
-
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
   assert(err == 0);
@@ -643,8 +640,6 @@ rocksdb_native__on_resume(rocksdb_resume_t *handle, int status) {
   auto db = reinterpret_cast<rocksdb_native_t *>(req->handle.req.db);
 
   auto env = req->env;
-
-  auto teardown = db->teardown;
 
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
@@ -1176,9 +1171,9 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
 
   auto db = reinterpret_cast<rocksdb_native_t *>(req->handle.req.db);
 
-  auto env = req->env;
-
   auto len = req->handle.len;
+
+  auto env = req->env;
 
   js_handle_scope_t *scope;
   err = js_open_handle_scope(env, &scope);
