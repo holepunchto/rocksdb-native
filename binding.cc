@@ -73,7 +73,6 @@ struct rocksdb_native_close_t {
 
   js_env_t *env;
   js_persistent_t<js_receiver_t> ctx;
-  js_persistent_t<js_arraybuffer_t> self;
   js_persistent_t<rocksdb_native_on_close_t> on_close;
 };
 
@@ -312,7 +311,6 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
     assert(err == 0);
 
     req->on_close.reset();
-    req->self.reset();
     req->ctx.reset();
 
     if (!db->exiting) {
@@ -513,9 +511,6 @@ rocksdb_native_close(
   }
 
   err = js_create_reference(env, ctx, req->ctx);
-  assert(err == 0);
-
-  err = js_create_reference(env, handle, req->self);
   assert(err == 0);
 
   err = js_create_reference(env, on_close, req->on_close);
