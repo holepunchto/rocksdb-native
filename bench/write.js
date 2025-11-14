@@ -1,4 +1,4 @@
-const crypto = require('bare-crypto')
+const crypto = require('crypto')
 const bench = require('./harness')
 
 module.exports = async function writeBenchmark(t, db, benchOpts) {

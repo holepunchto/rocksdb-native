@@ -7,8 +7,14 @@
     "./package": "./package.json"
   },
   "imports": {
-    "fs": "bare-fs",
-    "default": "fs"
+    "fs": {
+      "bare": "bare-fs",
+      "default": "fs"
+    },
+    "crypto": {
+      "bare": "bare-crypto",
+      "default": "crypto"
+    }
   },
   "files": [
     "index.js",
