@@ -1,13 +1,13 @@
 const bench = require('./harness')
 
-module.exports = function readBenchmark(t, db, keysLimit, opts) {
+module.exports = function readBenchmark(t, db, keysLimit, benchOpts, opts) {
   t.test('Reading', async (t) => {
     t.plan(1)
 
     let keysRead = 0
 
     const result = await bench(async () => {
-      const batch = db.read()
+      const batch = db.read(opts)
       const key = Buffer.from([getRandomValue(keysLimit)])
       const p = batch.get(key)
       await batch.flush()
@@ -15,7 +15,7 @@ module.exports = function readBenchmark(t, db, keysLimit, opts) {
       await p
 
       keysRead++
-    }, opts)
+    }, benchOpts)
 
     t.comment('Reading performance:', result, 'ops/s')
     t.comment('Keys read:', keysRead)

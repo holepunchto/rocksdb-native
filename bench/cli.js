@@ -9,9 +9,11 @@ const { BloomFilterPolicy, RibbonFilterPolicy } = RocksDB
 const cmd = command(
   'rocksdb-bench',
   summary('Interface for rocksdb-native benchmarks'),
+
   // Benchmark options
   flag('--duration|-d <value>', 'Maximum execution time per step in seconds, defaults to 15'),
-  // RocksDB options
+
+  // RocksDB state options
   flag('--maxBackgroundJobs <value>', 'Defaults to 6'),
   flag('--bytesPerSync <value>', 'Defaults to 1048576'),
   flag('--maxOpenFiles <value>', 'Defaults to -1'),
@@ -19,6 +21,7 @@ const cmd = command(
   flag('--avoidUnnecessaryBlockingIO'),
   flag('--useDirectIOForFlushAndCompaction'),
   flag('--maxFileOpeningThreads <value>', 'Defaults to 16'),
+
   // Column family options
   flag('--enableBlobFiles'),
   flag('--minBlobSize <value>', 'Defaults to 0'),
@@ -35,14 +38,26 @@ const cmd = command(
   flag('--optimizeFiltersForHits'),
   flag('--numLevels <value>', 'Defaults to 7'),
   flag('--maxWriteBufferNumber <value>', 'Defaults to 2'),
+
   // Filter options
   flag('--ribbon|-r', 'Use Ribbon filter policy'),
   flag('--bitsPerKey <value>', 'Defaults to 10'),
   flag('--bloomBeforeLevel <value>', 'Defaults to 0'),
 
+  // Read options
+  flag('--asyncIO'),
+  flag('--noFillCache'),
+
   async () => {
+    // Benchmark options
+    const benchOpts = {}
+
+    if (cmd.flags.duration) benchOpts.duration = Number(cmd.flags.duration)
+
+    // RocksDB options
     const dbOpts = {}
 
+    // State options
     if (cmd.flags.maxBackgroundJobs) dbOpts.maxBackgroundJobs = Number(cmd.flags.maxBackgroundJobs)
     if (cmd.flags.bytesPerSync) dbOpts.bytesPerSync = Number(cmd.flags.bytesPerSync)
     if (cmd.flags.maxOpenFiles) dbOpts.maxOpenFiles = Number(cmd.flags.maxOpenFiles)
@@ -52,6 +67,7 @@ const cmd = command(
     if (cmd.flags.maxFileOpeningThreads)
       dbOpts.maxFileOpeningThreads = Number(cmd.flags.maxFileOpeningThreads)
 
+    // Column family options
     if (cmd.flags.enableBlobFiles) dbOpts.enableBlobFiles = true
     if (cmd.flags.minBlobSize) dbOpts.minBlobSize = Number(cmd.flags.minBlobSize)
     if (cmd.flags.blobFileSize) dbOpts.blobFileSize = Number(cmd.flags.blobFileSize)
@@ -73,6 +89,7 @@ const cmd = command(
     if (cmd.flags.maxWriteBufferNumber)
       dbOpts.maxWriteBufferNumber = Number(cmd.flags.maxWriteBufferNumber)
 
+    // Filter options
     if (cmd.flags.ribbon || cmd.flags.bitsPerKey) {
       const _bitsPerKey = cmd.flags.bitsPerKey ? Number(cmd.flags.bitsPerKey) : 10
 
@@ -81,14 +98,17 @@ const cmd = command(
         : new BloomFilterPolicy(_bitsPerKey)
     }
 
-    const benchOpts = {}
-    if (cmd.flags.duration) benchOpts.duration = Number(cmd.flags.duration)
+    // Read options
+    const readOpts = {}
 
-    startBenchmark(dbOpts, benchOpts)
+    if (cmd.flags.asyncIO) readOpts.asyncIO = true
+    if (cmd.flags.noFillCache) readOpts.fillCache = false
+
+    startBenchmark(benchOpts, dbOpts, readOpts)
   }
 )
 
-async function startBenchmark(dbOpts, benchOpts) {
+async function startBenchmark(benchOpts, dbOpts, readOpts) {
   configure({ timeout: 600_000 })
 
   test('Benchmark', async (t) => {
@@ -98,7 +118,7 @@ async function startBenchmark(dbOpts, benchOpts) {
 
     const keysAmount = await writeBenchmark(t, db, benchOpts)
 
-    readBenchmark(t, db, keysAmount, benchOpts)
+    readBenchmark(t, db, keysAmount, benchOpts, readOpts)
   })
 }
 
