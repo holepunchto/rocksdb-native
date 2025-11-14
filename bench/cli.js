@@ -4,41 +4,58 @@ const { configure, test } = require('brittle')
 const writeBenchmark = require('./write')
 const readBenchmark = require('./read')
 const RocksDB = require('..')
+const { BloomFilterPolicy, RibbonFilterPolicy } = RocksDB
 
 const cmd = command(
   'rocksdb-bench',
   summary('Interface for rocksdb-native benchmarks'),
+  // Benchmark options
   flag(
     '--duration|-d <value>',
     'Maximum execution time per step in seconds, defaults to 15 seconds'
   ),
+  // RocksDB options
   flag('--maxBackgroundJobs <value>'),
   flag('--maxOpenFiles <value>'),
   flag('--useDirectReads'),
   flag('--avoidUnnecessaryBlockingIO'),
   flag('--useDirectIOForFlushAndCompaction'),
   flag('--maxFileOpeningThreads <value>'),
+  // Filter options
+  flag('--ribbon|-r', 'Use Ribbon filter policy'),
+  flag('--bitsPerKey <value>'),
+  flag('--bloomBeforeLevel <value>'),
 
   async () => {
-    const {
+    let {
       duration,
+
       maxBackgroundJobs,
       maxOpenFiles,
       useDirectReads,
       avoidUnnecessaryBlockingIO,
       useDirectIOForFlushAndCompaction,
-      maxFileOpeningThreads
+      maxFileOpeningThreads,
+
+      ribbon,
+      bitsPerKey,
+      bloomBeforeLevel
     } = cmd.flags
 
-    const dbOpts = {
-      useDirectReads,
-      avoidUnnecessaryBlockingIO,
-      useDirectIOForFlushAndCompaction
-    }
+    const dbOpts = { useDirectReads, avoidUnnecessaryBlockingIO, useDirectIOForFlushAndCompaction }
 
     if (maxBackgroundJobs) dbOpts.maxBackgroundJobs = Number(maxBackgroundJobs)
     if (maxOpenFiles) dbOpts.maxOpenFiles = Number(maxOpenFiles)
     if (maxFileOpeningThreads) dbOpts.maxFileOpeningThreads = Number(maxFileOpeningThreads)
+
+    if (ribbon || bitsPerKey || bloomBeforeLevel) {
+      bitsPerKey = bitsPerKey ? Number(bitsPerKey) : 10
+      bloomBeforeLevel = bloomBeforeLevel ? Number(bloomBeforeLevel) : 0
+
+      dbOpts.filterPolicy = ribbon
+        ? new RibbonFilterPolicy(bitsPerKey, bloomBeforeLevel)
+        : new BloomFilterPolicy(bitsPerKey)
+    }
 
     const benchOpts = { duration: duration ? Number(duration) * 1000 : 0 }
 
