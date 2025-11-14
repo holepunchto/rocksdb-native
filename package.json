@@ -10,9 +10,6 @@
     "fs": "bare-fs",
     "default": "fs"
   },
-  "bin": {
-    "rocksdb-bench": "bench/cli.js"
-  },
   "files": [
     "index.js",
     "binding.cc",
