@@ -8,7 +8,7 @@ module.exports = function readBenchmark(t, db, keysLimit, benchOpts, opts) {
 
     const result = await bench(async () => {
       const batch = db.read(opts)
-      const key = Buffer.from([getRandomValue(keysLimit)])
+      const key = String(getRandomValue(keysLimit))
       const p = batch.get(key)
       await batch.flush()
       batch.destroy()

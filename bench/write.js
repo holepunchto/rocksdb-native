@@ -9,7 +9,7 @@ module.exports = async function writeBenchmark(t, db, benchOpts) {
 
   const result = await bench(async () => {
     const batch = db.write()
-    const key = Buffer.from([keysWrote])
+    const key = String(keysWrote)
     const p = batch.put(key, crypto.randomBytes(32))
     await batch.flush()
     batch.destroy()
