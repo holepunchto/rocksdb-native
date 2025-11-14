@@ -52,7 +52,7 @@ const cmd = command(
     // Benchmark options
     const benchOpts = {}
 
-    if (cmd.flags.duration) benchOpts.duration = Number(cmd.flags.duration)
+    if (cmd.flags.duration) benchOpts.duration = Number(cmd.flags.duration * 1000)
 
     // RocksDB options
     const dbOpts = {}
