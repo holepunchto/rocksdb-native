@@ -19,7 +19,7 @@ using rocksdb_native_on_write_t = js_function_t<void, js_receiver_t, std::option
 using rocksdb_native_on_read_t = js_function_t<void, js_receiver_t, js_array_t, js_array_t>;
 using rocksdb_native_on_iterator_open_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
 using rocksdb_native_on_iterator_close_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
-using rocksdb_native_on_iterator_read_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>, std::vector<js_arraybuffer_t>, std::vector<js_arraybuffer_t>>;
+using rocksdb_native_on_iterator_read_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>, js_array_t, js_array_t>;
 using rocksdb_native_on_compact_range_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>>;
 using rocksdb_native_on_approximate_size_t = js_function_t<void, js_receiver_t, std::optional<js_string_t>, uint64_t>;
 
@@ -1036,11 +1036,13 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
 
   std::optional<js_string_t> error;
 
-  std::vector<js_arraybuffer_t> keys;
-  keys.reserve(len);
+  js_array_t keys;
+  err = js_create_array(env, len, keys);
+  assert(err == 0);
 
-  std::vector<js_arraybuffer_t> values;
-  values.reserve(len);
+  js_array_t values;
+  err = js_create_array(env, len, values);
+  assert(err == 0);
 
   if (req->handle.error) {
     err = js_create_string(env, req->handle.error, error.emplace());
@@ -1059,12 +1061,14 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
         err = rocksdb_native__try_create_external_arraybuffer(env, const_cast<char *>(key->data), key->len, result);
         assert(err == 0);
 
-        keys.push_back(result);
+        err = js_set_element(env, keys, i, result);
+        assert(err == 0);
 
         err = rocksdb_native__try_create_external_arraybuffer(env, const_cast<char *>(value->data), value->len, result);
         assert(err == 0);
 
-        values.push_back(result);
+        err = js_set_element(env, values, i, result);
+        assert(err == 0);
       }
     }
   }
