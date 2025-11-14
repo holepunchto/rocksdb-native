@@ -1,12 +1,13 @@
 const minimumSamplingTime = 500
 const minimumSamplingCount = 30
 
-const maximumSamplingTime = 30000
 const maximumRelativeError = 0.01
 
 const Z = 1.96
 
-module.exports = async function bench(fn) {
+module.exports = async function bench(fn, opts = {}) {
+  const maximumSamplingTime = opts.duration || 15_000
+
   let operations = 0
   let elapsed = 0
   let iterations = 1

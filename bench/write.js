@@ -1,7 +1,7 @@
 const crypto = require('bare-crypto')
 const bench = require('./harness')
 
-module.exports = async function writeBenchmark(t, db) {
+module.exports = async function writeBenchmark(t, db, opts) {
   const test = t.test('Writing')
   test.plan(1)
 
@@ -16,7 +16,7 @@ module.exports = async function writeBenchmark(t, db) {
     await p
 
     keysWrote++
-  })
+  }, opts)
 
   test.comment('Writing performance:', result, 'ops/s')
   test.comment('Keys wrote:', keysWrote)

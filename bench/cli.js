@@ -8,6 +8,10 @@ const RocksDB = require('..')
 const cmd = command(
   'rocksdb-bench',
   summary('Interface for rocksdb-native benchmarks'),
+  flag(
+    '--duration|-d <value>',
+    'Maximum execution time per step in seconds, defaults to 15 seconds'
+  ),
   flag('--maxBackgroundJobs <value>'),
   flag('--maxOpenFiles <value>'),
   flag('--useDirectReads'),
@@ -17,6 +21,7 @@ const cmd = command(
 
   async () => {
     const {
+      duration,
       maxBackgroundJobs,
       maxOpenFiles,
       useDirectReads,
@@ -25,27 +30,33 @@ const cmd = command(
       maxFileOpeningThreads
     } = cmd.flags
 
-    const opts = { useDirectReads, avoidUnnecessaryBlockingIO, useDirectIOForFlushAndCompaction }
+    const dbOpts = {
+      useDirectReads,
+      avoidUnnecessaryBlockingIO,
+      useDirectIOForFlushAndCompaction
+    }
 
-    if (maxBackgroundJobs) opts.maxBackgroundJobs = Number(maxBackgroundJobs)
-    if (maxOpenFiles) opts.maxOpenFiles = Number(maxOpenFiles)
-    if (maxFileOpeningThreads) opts.maxFileOpeningThreads = Number(maxFileOpeningThreads)
+    if (maxBackgroundJobs) dbOpts.maxBackgroundJobs = Number(maxBackgroundJobs)
+    if (maxOpenFiles) dbOpts.maxOpenFiles = Number(maxOpenFiles)
+    if (maxFileOpeningThreads) dbOpts.maxFileOpeningThreads = Number(maxFileOpeningThreads)
 
-    startBenchmark(opts)
+    const benchOpts = { duration: duration ? Number(duration) * 1000 : 0 }
+
+    startBenchmark(dbOpts, benchOpts)
   }
 )
 
-async function startBenchmark(opts) {
+async function startBenchmark(dbOpts, benchOpts) {
   configure({ timeout: 600_000 })
 
   test('Benchmark', async (t) => {
-    const db = new RocksDB(await t.tmp(), opts)
+    const db = new RocksDB(await t.tmp(), dbOpts)
     await db.ready()
     t.teardown(() => db.close())
 
-    const keysAmount = await writeBenchmark(t, db)
+    const keysAmount = await writeBenchmark(t, db, benchOpts)
 
-    readBenchmark(t, db, keysAmount)
+    readBenchmark(t, db, keysAmount, benchOpts)
   })
 }
 
