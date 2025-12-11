@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <set>
 
 #include <assert.h>
@@ -1609,6 +1610,7 @@ rocksdb_native_compact_range(
   js_typedarray_t<> start,
   js_typedarray_t<> end,
   bool exclusive,
+  bool force_blob_gc,
   js_receiver_t ctx,
   rocksdb_native_on_compact_range_t on_compact_range
 ) {
@@ -1632,9 +1634,15 @@ rocksdb_native_compact_range(
   req->handle.data = req;
 
   rocksdb_compact_range_options_t options = {
-    .version = 0,
+    .version = 1,
     .exclusive_manual_compaction = exclusive
   };
+
+  if(force_blob_gc) {
+      options.blob_garbage_collection_age_cutoff = 0.0;
+      options.blob_garbage_collection_policy = rocksdb_force_blob_garbage_collection_policy;
+      options.bottommost_level_compaction = rocksdb_force_bottommost_level_compaction;
+  }
 
   err = rocksdb_compact_range(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, &options, rocksdb_native__on_compact_range);
 
