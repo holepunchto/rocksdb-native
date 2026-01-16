@@ -383,7 +383,7 @@ rocksdb_native_init(
   new (&db->snapshots) std::set<rocksdb_native_snapshot_t *>();
 
   db->options = (rocksdb_options_t) {
-    3,
+    4,
     read_only,
     create_if_missing,
     create_missing_column_families,
@@ -701,7 +701,9 @@ rocksdb_native_column_family_init(
   uint32_t unpartitioned_pinning_tier,
   bool optimize_filters_for_hits,
   int32_t num_levels,
-  int32_t max_write_buffer_number
+  int32_t max_write_buffer_number,
+  double blob_garbage_collection_age_cutoff,
+  double blob_garbage_collection_force_threshold
 ) {
   int err;
 
@@ -739,25 +741,26 @@ rocksdb_native_column_family_init(
 
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
     name,
-    {
-      3,
-      rocksdb_level_compaction,
-      enable_blob_files,
-      min_blob_size,
-      blob_file_size,
-      enable_blob_garbage_collection,
-      block_size,
-      cache_index_and_filter_blocks,
-      format_version,
-      optimize_filters_for_memory,
-      no_block_cache,
-      filter_policy,
-      rocksdb_pinning_tier_t(top_level_index_pinning_tier),
-      rocksdb_pinning_tier_t(partition_pinning_tier),
-      rocksdb_pinning_tier_t(unpartitioned_pinning_tier),
-      optimize_filters_for_hits,
-      num_levels,
-      max_write_buffer_number,
+    {5,
+     rocksdb_level_compaction,
+     enable_blob_files,
+     min_blob_size,
+     blob_file_size,
+     enable_blob_garbage_collection,
+     block_size,
+     cache_index_and_filter_blocks,
+     format_version,
+     optimize_filters_for_memory,
+     no_block_cache,
+     filter_policy,
+     rocksdb_pinning_tier_t(top_level_index_pinning_tier),
+     rocksdb_pinning_tier_t(partition_pinning_tier),
+     rocksdb_pinning_tier_t(unpartitioned_pinning_tier),
+     optimize_filters_for_hits,
+     num_levels,
+     max_write_buffer_number,
+     blob_garbage_collection_age_cutoff,
+     blob_garbage_collection_force_threshold
     }
   };
 
@@ -1610,7 +1613,9 @@ rocksdb_native_compact_range(
   js_typedarray_t<> start,
   js_typedarray_t<> end,
   bool exclusive,
-  bool force_blob_gc,
+  uint32_t blob_garbage_collection_policy,
+  double blob_garbage_collection_age_cutoff,
+  uint32_t bottommost_level_compaction,
   js_receiver_t ctx,
   rocksdb_native_on_compact_range_t on_compact_range
 ) {
@@ -1635,14 +1640,11 @@ rocksdb_native_compact_range(
 
   rocksdb_compact_range_options_t options = {
     .version = 1,
-    .exclusive_manual_compaction = exclusive
+    .exclusive_manual_compaction = exclusive,
+    .blob_garbage_collection_policy = rocksdb_blob_garbage_collection_policy_t(blob_garbage_collection_policy),
+    .blob_garbage_collection_age_cutoff = blob_garbage_collection_age_cutoff,
+    .bottommost_level_compaction = rocksdb_bottommost_level_compaction_t(bottommost_level_compaction),
   };
-
-  if(force_blob_gc) {
-      options.blob_garbage_collection_age_cutoff = 0.0;
-      options.blob_garbage_collection_policy = rocksdb_force_blob_garbage_collection_policy;
-      options.bottommost_level_compaction = rocksdb_force_bottommost_level_compaction;
-  }
 
   err = rocksdb_compact_range(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, &options, rocksdb_native__on_compact_range);
 
