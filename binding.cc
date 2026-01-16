@@ -741,26 +741,27 @@ rocksdb_native_column_family_init(
 
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
     name,
-    {5,
-     rocksdb_level_compaction,
-     enable_blob_files,
-     min_blob_size,
-     blob_file_size,
-     enable_blob_garbage_collection,
-     block_size,
-     cache_index_and_filter_blocks,
-     format_version,
-     optimize_filters_for_memory,
-     no_block_cache,
-     filter_policy,
-     rocksdb_pinning_tier_t(top_level_index_pinning_tier),
-     rocksdb_pinning_tier_t(partition_pinning_tier),
-     rocksdb_pinning_tier_t(unpartitioned_pinning_tier),
-     optimize_filters_for_hits,
-     num_levels,
-     max_write_buffer_number,
-     blob_garbage_collection_age_cutoff,
-     blob_garbage_collection_force_threshold
+    {
+      5,
+      rocksdb_level_compaction,
+      enable_blob_files,
+      min_blob_size,
+      blob_file_size,
+      enable_blob_garbage_collection,
+      block_size,
+      cache_index_and_filter_blocks,
+      format_version,
+      optimize_filters_for_memory,
+      no_block_cache,
+      filter_policy,
+      rocksdb_pinning_tier_t(top_level_index_pinning_tier),
+      rocksdb_pinning_tier_t(partition_pinning_tier),
+      rocksdb_pinning_tier_t(unpartitioned_pinning_tier),
+      optimize_filters_for_hits,
+      num_levels,
+      max_write_buffer_number,
+      blob_garbage_collection_age_cutoff,
+      blob_garbage_collection_force_threshold
     }
   };
 
