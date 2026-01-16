@@ -64,8 +64,9 @@ const cmd = command(
     if (cmd.flags.useDirectReads) dbOpts.useDirectReads = true
     if (cmd.flags.avoidUnnecessaryBlockingIO) dbOpts.avoidUnnecessaryBlockingIO = true
     if (cmd.flags.useDirectIOForFlushAndCompaction) dbOpts.useDirectIOForFlushAndCompaction = true
-    if (cmd.flags.maxFileOpeningThreads)
+    if (cmd.flags.maxFileOpeningThreads) {
       dbOpts.maxFileOpeningThreads = Number(cmd.flags.maxFileOpeningThreads)
+    }
 
     // Column family options
     if (cmd.flags.enableBlobFiles) dbOpts.enableBlobFiles = true
@@ -74,20 +75,25 @@ const cmd = command(
     if (cmd.flags.noBlobGarbageCollection) dbOpts.enableBlobGarbageCollection = false
     if (cmd.flags.tableBlockSize) dbOpts.tableBlockSize = Number(cmd.flags.tableBlockSize)
     if (cmd.flags.noTableCacheIndexAndFilterBlocks) dbOpts.tableCacheIndexAndFilterBlocks = false
-    if (cmd.flags.tableFormatVersion)
+    if (cmd.flags.tableFormatVersion) {
       dbOpts.tableFormatVersion = Number(cmd.flags.tableFormatVersion)
+    }
     if (cmd.flags.optimizeFiltersForMemory) dbOpts.optimizeFiltersForMemory = true
     if (cmd.flags.noBlockCache) dbOpts.blockCache = false
-    if (cmd.flags.topLevelIndexPinningTier)
+    if (cmd.flags.topLevelIndexPinningTier) {
       dbOpts.topLevelIndexPinningTier = Number(cmd.flags.topLevelIndexPinningTier)
-    if (cmd.flags.partitionPinningTier)
+    }
+    if (cmd.flags.partitionPinningTier) {
       dbOpts.partitionPinningTier = Number(cmd.flags.partitionPinningTier)
-    if (cmd.flags.unpartitionedPinningTier)
+    }
+    if (cmd.flags.unpartitionedPinningTier) {
       dbOpts.unpartitionedPinningTier = Number(cmd.flags.unpartitionedPinningTier)
+    }
     if (cmd.flags.optimizeFiltersForHits) dbOpts.optimizeFiltersForHits = true
     if (cmd.flags.numLevels) dbOpts.numLevels = Number(cmd.flags.numLevels)
-    if (cmd.flags.maxWriteBufferNumber)
+    if (cmd.flags.maxWriteBufferNumber) {
       dbOpts.maxWriteBufferNumber = Number(cmd.flags.maxWriteBufferNumber)
+    }
 
     // Filter options
     if (cmd.flags.ribbon || cmd.flags.bitsPerKey) {
