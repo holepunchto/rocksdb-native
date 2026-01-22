@@ -1,5 +1,6 @@
 const test = require('brittle')
 const fs = require('fs')
+const path = require('path')
 const c = require('compact-encoding')
 const FDLock = require('fd-lock')
 const RocksDB = require('.')
@@ -1166,6 +1167,12 @@ test('fd lock + suspend + close', async (t) => {
   await db.close()
 
   await t.exception(() => fs.fstatSync(fd), /EBADF/)
+})
+
+test('open utf8', async (t) => {
+  const db = new RocksDB(path.join(await t.tmp(), 'hællø'))
+  await db.ready()
+  await db.close()
 })
 
 function noop() {}
