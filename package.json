@@ -7,13 +7,17 @@
     "./package": "./package.json"
   },
   "imports": {
+    "crypto": {
+      "bare": "bare-crypto",
+      "default": "crypto"
+    },
     "fs": {
       "bare": "bare-fs",
       "default": "fs"
     },
-    "crypto": {
-      "bare": "bare-crypto",
-      "default": "crypto"
+    "path": {
+      "bare": "bare-path",
+      "default": "path"
     }
   },
   "files": [
@@ -47,6 +51,7 @@
     "bare": ">=1.16.0"
   },
   "dependencies": {
+    "bare-path": "^3.0.0",
     "compact-encoding": "^2.15.0",
     "ready-resource": "^1.0.0",
     "refcounter": "^1.0.0",
