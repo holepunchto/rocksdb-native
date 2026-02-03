@@ -1175,4 +1175,59 @@ test('open utf8', async (t) => {
   await db.close()
 })
 
+test('stats', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  {
+    const batch = db.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    batch.destroy()
+    await p
+    t.is(db.stats.writeBatches, 1)
+    t.is(db.stats.puts, 1)
+  }
+
+  {
+    const batch = db.write()
+    const p = batch.put('hello', 'world')
+    const p2 = batch.put('hello2', 'world')
+
+    await batch.flush()
+    batch.destroy()
+    await p
+    await p2
+    t.is(db.stats.writeBatches, 2)
+    t.is(db.stats.puts, 3)
+  }
+
+  t.is(db.stats.readBatches, 0, 'sanity check')
+  t.is(db.stats.gets, 0, 'sanity check')
+
+  {
+    const batch = db.read()
+    const p = batch.get('hello')
+    await batch.flush()
+    batch.destroy()
+    await p
+    t.is(db.stats.readBatches, 1)
+    t.is(db.stats.gets, 1)
+  }
+
+  {
+    const batch = db.read()
+    const p = batch.get('hello')
+    const p2 = batch.get('hello2')
+    await batch.flush()
+    batch.destroy()
+    await p
+    await p2
+    t.is(db.stats.readBatches, 2)
+    t.is(db.stats.gets, 3)
+  }
+
+  await db.close()
+})
+
 function noop() {}

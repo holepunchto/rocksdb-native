@@ -15,6 +15,13 @@ class RocksDB {
       valueEncoding = null
     } = opts
 
+    this.stats = {
+      readBatches: 0,
+      writeBatches: 0,
+      gets: 0,
+      puts: 0
+    }
+
     this._state = state
     this._snapshot = snapshot
     this._columnFamily = state.getColumnFamily(columnFamily)
@@ -137,12 +144,14 @@ class RocksDB {
 
   read(opts) {
     maybeClosed(this)
+    this.stats.readBatches++
 
     return this._state.createReadBatch(this, opts)
   }
 
   write(opts) {
     maybeClosed(this)
+    this.stats.writeBatches++
 
     return this._state.createWriteBatch(this, opts)
   }
