@@ -1091,7 +1091,8 @@ test('suspend + open new writer', async (t) => {
   await t.exception(w1.resume())
 
   await w2.close()
-  await t.execution(w1.resume())
+
+  await t.exception(w1.resume())
 
   await w1.close()
 })
@@ -1167,6 +1168,37 @@ test('fd lock + suspend + close', async (t) => {
   await db.close()
 
   await t.exception(() => fs.fstatSync(fd), /EBADF/)
+})
+
+test('fd lock + suspend + open new writer, attempt to overwrite', async (t) => {
+  const dir = await t.tmp()
+
+  const fd1 = fs.openSync('test/fixtures/lock', 'w+')
+  const lock1 = new FDLock(fd1)
+
+  const w1 = new RocksDB(dir, { lock: lock1 })
+  await w1.ready()
+  await w1.suspend()
+
+  const fd2 = fs.openSync('test/fixtures/lock', 'w+')
+  const lock2 = new FDLock(fd2)
+
+  const w2 = new RocksDB(dir, { lock: lock2 })
+  await w2.ready()
+
+  {
+    const batch = w2.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    batch.destroy()
+    await p
+  }
+
+  await w2.close()
+
+  await t.exception(w1.resume())
+
+  await w1.close()
 })
 
 test('open utf8', async (t) => {

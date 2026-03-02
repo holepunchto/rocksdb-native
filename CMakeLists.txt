@@ -9,7 +9,7 @@ project(rocksdb_native C CXX)
 
 bare_target(target)
 
-fetch_package("github:holepunchto/librocksdb#4e9393e")
+fetch_package("github:holepunchto/librocksdb#44a810b")
 fetch_package("github:holepunchto/libjstl#098664c")
 
 add_bare_module(rocksdb_native_bare)
@@ -24,12 +24,10 @@ target_link_libraries(
   ${rocksdb_native_bare}
   PRIVATE
     $<TARGET_OBJECTS:rocksdb>
-    $<TARGET_OBJECTS:path>
     jstl
   PUBLIC
     rocksdb
     rocksdb_facebook
-    path
 )
 
 add_napi_module(rocksdb_native_napi)
@@ -50,12 +48,10 @@ target_link_libraries(
   ${rocksdb_native_napi}
   PRIVATE
     $<TARGET_OBJECTS:rocksdb>
-    $<TARGET_OBJECTS:path>
     jstl
   PUBLIC
     rocksdb
     rocksdb_facebook
-    path
 )
 
 resolve_node_module(bare-compat-napi compat)
