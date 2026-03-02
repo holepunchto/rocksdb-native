@@ -1091,7 +1091,8 @@ test('suspend + open new writer', async (t) => {
   await t.exception(w1.resume())
 
   await w2.close()
-  await t.execution(w1.resume())
+
+  await t.exception(w1.resume())
 
   await w1.close()
 })
