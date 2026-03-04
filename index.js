@@ -22,8 +22,6 @@ class RocksDB {
     this._valueEncoding = valueEncoding
     this._index = -1
 
-    this.stats = this._state.stats
-
     this._state.addSession(this)
   }
 
@@ -37,6 +35,10 @@ class RocksDB {
 
   get path() {
     return this._state.path
+  }
+
+  get stats() {
+    return this._state.stats
   }
 
   get snapshotted() {
