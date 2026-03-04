@@ -15,19 +15,14 @@ class RocksDB {
       valueEncoding = null
     } = opts
 
-    this.stats = {
-      readBatches: 0,
-      writeBatches: 0,
-      gets: 0,
-      puts: 0
-    }
-
     this._state = state
     this._snapshot = snapshot
     this._columnFamily = state.getColumnFamily(columnFamily)
     this._keyEncoding = keyEncoding
     this._valueEncoding = valueEncoding
     this._index = -1
+
+    this.stats = this._state.stats
 
     this._state.addSession(this)
   }
@@ -144,14 +139,12 @@ class RocksDB {
 
   read(opts) {
     maybeClosed(this)
-    this.stats.readBatches++
 
     return this._state.createReadBatch(this, opts)
   }
 
   write(opts) {
     maybeClosed(this)
-    this.stats.writeBatches++
 
     return this._state.createWriteBatch(this, opts)
   }
