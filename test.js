@@ -1259,6 +1259,32 @@ test('stats', async (t) => {
     t.is(db.stats.gets, 3)
   }
 
+  {
+    const batch = db.write()
+    const p = batch.delete('hello', 'world')
+    const p2 = batch.delete('hello2', 'world')
+
+    await batch.flush()
+    batch.destroy()
+    await p
+    await p2
+    t.is(db.stats.writeBatches, 3)
+    t.is(db.stats.deletes, 2)
+  }
+
+  {
+    const batch = db.write()
+    const p = batch.deleteRange('hello', 'hello4')
+    const p2 = batch.deleteRange('more', 'range')
+
+    await batch.flush()
+    batch.destroy()
+    await p
+    await p2
+    t.is(db.stats.writeBatches, 4)
+    t.is(db.stats.rangeDeletes, 2)
+  }
+
   await db.close()
 })
 
