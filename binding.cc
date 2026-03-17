@@ -365,7 +365,9 @@ rocksdb_native_init(
   bool avoid_unnecessary_blocking_io,
   bool skip_stats_update_on_db_open,
   bool use_direct_io_for_flush_and_compaction,
-  int32_t max_file_opening_threads
+  int32_t max_file_opening_threads,
+  uint32_t wal_recovery_mode,
+  bool best_efforts_recovery
 ) {
   int err;
 
@@ -383,7 +385,7 @@ rocksdb_native_init(
   new (&db->snapshots) std::set<rocksdb_native_snapshot_t *>();
 
   db->options = (rocksdb_options_t) {
-    4,
+    5,
     read_only,
     create_if_missing,
     create_missing_column_families,
@@ -396,6 +398,8 @@ rocksdb_native_init(
     use_direct_io_for_flush_and_compaction,
     max_file_opening_threads,
     -1,
+    rocksdb_wal_recovery_mode_t(wal_recovery_mode),
+    best_efforts_recovery,
   };
 
   return handle;
@@ -761,7 +765,7 @@ rocksdb_native_column_family_init(
       num_levels,
       max_write_buffer_number,
       blob_garbage_collection_age_cutoff,
-      blob_garbage_collection_force_threshold
+      blob_garbage_collection_force_threshold,
     }
   };
 
