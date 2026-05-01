@@ -51,7 +51,7 @@
     "bare": ">=1.16.0"
   },
   "dependencies": {
-    "compact-encoding": "^2.15.0",
+    "compact-encoding": "^3.0.0",
     "ready-resource": "^1.0.0",
     "refcounter": "^1.0.0",
     "require-addon": "^1.0.2",
