@@ -1,9 +1,11 @@
 name: Integrate
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 permissions:
   contents: read
 jobs:
@@ -29,20 +31,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     name: Test / ${{ matrix.platform }}-${{ matrix.arch }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: holepunchto/actions/bare-base@v1
+      - uses: holepunchto/actions/compile-prebuilds@v1
         with:
-          node-version: lts/*
-      - run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 20
-        if: ${{ matrix.platform == 'linux' }}
-      - run: choco upgrade llvm
-        if: ${{ matrix.platform == 'win32' }}
-      - run: npm install -g bare-runtime bare-make
-      - run: npm install
-      - run: bare-make generate --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --debug
-      - run: bare-make build
-      - run: bare-make install
+          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+          flags: --debug
       - run: npm test
