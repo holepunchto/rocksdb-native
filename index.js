@@ -96,10 +96,10 @@ class RocksDB {
     return this.isRoot() ? this._state.close() : Promise.resolve()
   }
 
-  suspend() {
+  suspend(opts) {
     maybeClosed(this)
 
-    return this._state.suspend()
+    return this._state.suspend(opts)
   }
 
   resume() {
