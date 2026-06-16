@@ -1304,6 +1304,7 @@ test('diagnostics reflects state', async (t) => {
       handles: 0,
       sessions: 1
     })
+    t.comment(db.diagnostics())
   }
 
   {
