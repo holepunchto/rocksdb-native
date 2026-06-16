@@ -839,6 +839,17 @@ test('suspend + resume', async (t) => {
   await db.close()
 })
 
+test('suspend with log', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  t.teardown(() => db.close())
+  await db.ready()
+
+  const logs = []
+  await db.suspend({ log: (msg) => logs.push(msg) })
+
+  t.ok(logs.length > 0, 'log was called')
+})
+
 test('suspend + resume + close before resolved', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
