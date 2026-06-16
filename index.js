@@ -209,8 +209,8 @@ class RocksDB {
     this._state.handles.dec()
   }
 
-  diagnosis() {
-    return this._state.diagnosis()
+  diagnostics() {
+    return this._state.diagnostics()
   }
 }
 
