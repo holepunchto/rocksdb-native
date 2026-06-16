@@ -208,6 +208,10 @@ class RocksDB {
     if (this._snapshot) this._snapshot.unref()
     this._state.handles.dec()
   }
+
+  diagnostics() {
+    return this._state.diagnostics()
+  }
 }
 
 module.exports = exports = RocksDB

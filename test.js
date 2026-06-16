@@ -1288,4 +1288,56 @@ test('stats', async (t) => {
   await db.close()
 })
 
+test('diagnostics reflects state', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  t.teardown(() => db.close())
+
+  await db.ready()
+
+  {
+    t.alike(db.diagnostics(), {
+      suspended: false,
+      suspending: false,
+      updating: false,
+      resumedPending: false,
+      io: 0,
+      handles: 0,
+      sessions: 1
+    })
+    t.comment(db.diagnostics())
+  }
+
+  {
+    const s = db.session()
+    t.is(db.diagnostics().sessions, 2)
+    await s.close()
+    t.is(db.diagnostics().sessions, 1)
+  }
+
+  {
+    const batch = db.read()
+    t.is(db.diagnostics().handles, 1)
+    await batch.destroy()
+    t.is(db.diagnostics().handles, 0)
+  }
+
+  {
+    await db.suspend()
+    const d = db.diagnostics()
+    t.is(d.suspended, true)
+    // resumed promise is set until resume() clears it
+    t.is(d.resumedPending, true)
+
+    await db.resume()
+    const d2 = db.diagnostics()
+    t.is(d2.suspended, false)
+    t.is(d2.resumedPending, false)
+  }
+
+  {
+    await db.suspend()
+    t.is(db.diagnostics().suspended, true)
+  }
+})
+
 function noop() {}
