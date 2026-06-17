@@ -57,7 +57,7 @@ class RocksDB {
     snapshot = this._snapshot !== null,
     keyEncoding = this._keyEncoding,
     valueEncoding = this._valueEncoding,
-    logger = this.logger,
+    logger = this.logger
   } = {}) {
     maybeClosed(this)
 
@@ -67,8 +67,7 @@ class RocksDB {
       snapshot: snapshot ? this._snapshot || new Snapshot(this._state) : null,
       keyEncoding,
       valueEncoding,
-      logger,
-
+      logger
     })
   }
 
