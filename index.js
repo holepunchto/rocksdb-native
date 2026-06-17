@@ -4,6 +4,7 @@ const Snapshot = require('./lib/snapshot')
 const State = require('./lib/state')
 const { BloomFilterPolicy, RibbonFilterPolicy } = require('./lib/filter-policy')
 const constants = require('./lib/constants')
+const { noLogger } = require('./lib/logger')
 
 class RocksDB {
   constructor(path, opts = {}) {
@@ -12,7 +13,8 @@ class RocksDB {
       state = new State(this, path, opts),
       snapshot = null,
       keyEncoding = null,
-      valueEncoding = null
+      valueEncoding = null,
+      logger = noLogger
     } = opts
 
     this._state = state
@@ -21,6 +23,7 @@ class RocksDB {
     this._keyEncoding = keyEncoding
     this._valueEncoding = valueEncoding
     this._index = -1
+    this._logger = logger
 
     this._state.addSession(this)
   }
@@ -53,7 +56,8 @@ class RocksDB {
     columnFamily = this._columnFamily,
     snapshot = this._snapshot !== null,
     keyEncoding = this._keyEncoding,
-    valueEncoding = this._valueEncoding
+    valueEncoding = this._valueEncoding,
+    logger = this.logger,
   } = {}) {
     maybeClosed(this)
 
@@ -62,7 +66,9 @@ class RocksDB {
       columnFamily,
       snapshot: snapshot ? this._snapshot || new Snapshot(this._state) : null,
       keyEncoding,
-      valueEncoding
+      valueEncoding,
+      logger,
+
     })
   }
 
