@@ -4,7 +4,6 @@ const Snapshot = require('./lib/snapshot')
 const State = require('./lib/state')
 const { BloomFilterPolicy, RibbonFilterPolicy } = require('./lib/filter-policy')
 const constants = require('./lib/constants')
-const { noLogger } = require('./lib/logger')
 
 class RocksDB {
   constructor(path, opts = {}) {
@@ -14,7 +13,7 @@ class RocksDB {
       snapshot = null,
       keyEncoding = null,
       valueEncoding = null,
-      logger = noLogger
+      logger = null
     } = opts
 
     this._state = state
@@ -216,6 +215,12 @@ class RocksDB {
 
   diagnostics() {
     return this._state.diagnostics()
+  }
+
+  _log(...data) {
+    if (this._logger && typeof this._logger.log === 'function') {
+      this._logger.log(...data)
+    }
   }
 }
 

@@ -1341,7 +1341,6 @@ test('diagnostics reflects state', async (t) => {
 })
 
 test('logger', async (t) => {
-  const logs = []
   const db = new RocksDB(await t.tmp(), { logger: { log: noop } })
   t.teardown(() => db.close())
 
