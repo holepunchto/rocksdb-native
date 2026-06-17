@@ -1340,4 +1340,20 @@ test('diagnostics reflects state', async (t) => {
   }
 })
 
+test('logger', async (t) => {
+  const db = new RocksDB(await t.tmp(), { logger: { log: noop } })
+  t.teardown(() => db.close())
+
+  await t.execution(db.ready())
+  await t.execution(db.suspend())
+})
+
+test('default noLogger when none passed', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  t.teardown(() => db.close())
+
+  await t.execution(db.ready())
+  await t.execution(db.suspend())
+})
+
 function noop() {}

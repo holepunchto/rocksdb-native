@@ -12,7 +12,8 @@ class RocksDB {
       state = new State(this, path, opts),
       snapshot = null,
       keyEncoding = null,
-      valueEncoding = null
+      valueEncoding = null,
+      logger = null
     } = opts
 
     this._state = state
@@ -21,6 +22,7 @@ class RocksDB {
     this._keyEncoding = keyEncoding
     this._valueEncoding = valueEncoding
     this._index = -1
+    this._logger = logger
 
     this._state.addSession(this)
   }
@@ -53,7 +55,8 @@ class RocksDB {
     columnFamily = this._columnFamily,
     snapshot = this._snapshot !== null,
     keyEncoding = this._keyEncoding,
-    valueEncoding = this._valueEncoding
+    valueEncoding = this._valueEncoding,
+    logger = this.logger
   } = {}) {
     maybeClosed(this)
 
@@ -62,7 +65,8 @@ class RocksDB {
       columnFamily,
       snapshot: snapshot ? this._snapshot || new Snapshot(this._state) : null,
       keyEncoding,
-      valueEncoding
+      valueEncoding,
+      logger
     })
   }
 
@@ -96,10 +100,10 @@ class RocksDB {
     return this.isRoot() ? this._state.close() : Promise.resolve()
   }
 
-  suspend() {
+  suspend(opts) {
     maybeClosed(this)
 
-    return this._state.suspend()
+    return this._state.suspend(opts)
   }
 
   resume() {
@@ -211,6 +215,12 @@ class RocksDB {
 
   diagnostics() {
     return this._state.diagnostics()
+  }
+
+  _log(...data) {
+    if (this._logger && typeof this._logger.log === 'function') {
+      this._logger.log(...data)
+    }
   }
 }
 
