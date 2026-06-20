@@ -1288,6 +1288,20 @@ test('stats', async (t) => {
   await db.close()
 })
 
+test('propertyValue', async (t) => {
+  const db = new RocksDB(await t.tmp(), {
+    enableStatistics: true
+  })
+  await db.ready()
+
+  const stats = db.propertyGet('rocksdb.options-statistics')
+  t.is(typeof stats, 'string')
+  t.ok(stats.includes('rocksdb.block.cache.hit COUNT'))
+  t.ok(stats.includes('rocksdb.block.cache.miss COUNT'))
+
+  await db.close()
+})
+
 test('diagnostics reflects state', async (t) => {
   const db = new RocksDB(await t.tmp())
   t.teardown(() => db.close())

@@ -2,6 +2,7 @@ const ColumnFamily = require('./lib/column-family')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
 const State = require('./lib/state')
+const binding = require('./binding')
 const { BloomFilterPolicy, RibbonFilterPolicy } = require('./lib/filter-policy')
 const constants = require('./lib/constants')
 
@@ -221,6 +222,12 @@ class RocksDB {
     maybeClosed(this)
 
     await this._state.setStatsLevel(level)
+  }
+
+  propertyGet(name) {
+    maybeClosed(this)
+    return binding.propertyGet(this._state._handle, name)
+
   }
 
   _ref() {

@@ -2072,6 +2072,24 @@ rocksdb_native_stats_level_set(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_n
   }
 }
 
+static std::optional<std::string>
+rocksdb_native_property_get(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
+  std::string name
+) {
+  rocksdb_slice_t value;
+  int err = rocksdb_property_get(&db->handle, name.c_str(), &value);
+
+  if (err == UV_ENOENT) return std::nullopt;
+  assert(err == 0);
+
+  std::string result(value.data, value.len);
+  rocksdb_slice_destroy(&value);
+
+  return result;
+}
+
 static js_arraybuffer_t
 rocksdb_native_snapshot_create(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_t, 1> db) {
   int err;
@@ -2151,6 +2169,7 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("compactRange", rocksdb_native_compact_range)
   V("approximateSize", rocksdb_native_approximate_size)
   V("currentWalFile", rocksdb_native_current_wal_file)
+  V("propertyGet", rocksdb_native_property_get)
 
   V("snapshotCreate", rocksdb_native_snapshot_create)
   V("snapshotDestroy", rocksdb_native_snapshot_destroy)
