@@ -20,8 +20,10 @@ using rocksdb_native_on_read_t = js_function_t<void, js_receiver_t, js_array_t, 
 using rocksdb_native_on_iterator_open_t = js_function_t<void, js_receiver_t, std::optional<js_object_t>>;
 using rocksdb_native_on_iterator_close_t = js_function_t<void, js_receiver_t, std::optional<js_object_t>>;
 using rocksdb_native_on_iterator_read_t = js_function_t<void, js_receiver_t, std::optional<js_object_t>, js_array_t, js_array_t>;
+using rocksdb_native_on_compact_t = js_function_t<void, js_receiver_t, std::optional<js_object_t>>;
 using rocksdb_native_on_compact_range_t = js_function_t<void, js_receiver_t, std::optional<js_object_t>>;
 using rocksdb_native_on_approximate_size_t = js_function_t<void, js_receiver_t, std::optional<js_object_t>, uint64_t>;
+using rocksdb_native_on_current_wal_file_t = js_function_t<void, js_receiver_t, std::optional<js_object_t>, char *, uint64_t, uint32_t, uint64_t, uint64_t>;
 
 struct rocksdb_native_t;
 
@@ -45,6 +47,9 @@ struct rocksdb_native_snapshot_t {
 struct rocksdb_native_t {
   rocksdb_t handle;
   rocksdb_options_t options;
+
+  rocksdb_slice_t *wal_filter_prefixes;
+  size_t wal_filter_prefixes_len;
 
   js_env_t *env;
   js_persistent_t<js_receiver_t> ctx;
@@ -144,12 +149,28 @@ struct rocksdb_native_flush_t {
   js_persistent_t<rocksdb_native_column_family_t> column_family;
 };
 
+struct rocksdb_native_compact_t {
+  rocksdb_compact_t handle;
+
+  js_env_t *env;
+  js_persistent_t<js_receiver_t> ctx;
+  js_persistent_t<rocksdb_native_on_compact_t> on_compact;
+};
+
 struct rocksdb_native_compact_range_t {
   rocksdb_compact_range_t handle;
 
   js_env_t *env;
   js_persistent_t<js_receiver_t> ctx;
   js_persistent_t<rocksdb_native_on_compact_range_t> on_compact_range;
+};
+
+struct rocksdb_native_current_wal_file_t {
+  rocksdb_current_wal_file_t handle;
+
+  js_env_t *env;
+  js_persistent_t<js_receiver_t> ctx;
+  js_persistent_t<rocksdb_native_on_current_wal_file_t> on_current_wal_file;
 };
 
 struct rocksdb_native_approximate_size_t {
@@ -281,6 +302,17 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
 
   db->column_families.~set();
   db->snapshots.~set();
+
+  if (db->wal_filter_prefixes) {
+    for (size_t i = 0; i < db->wal_filter_prefixes_len; i++) {
+      free(const_cast<char *>(db->wal_filter_prefixes[i].data));
+    }
+
+    free(db->wal_filter_prefixes);
+
+    db->wal_filter_prefixes = nullptr;
+    db->wal_filter_prefixes_len = 0;
+  }
 }
 
 static void
@@ -366,9 +398,39 @@ rocksdb_native_init(
   bool use_direct_io_for_flush_and_compaction,
   int32_t max_file_opening_threads,
   uint32_t wal_recovery_mode,
-  bool best_efforts_recovery
+  bool best_efforts_recovery,
+  bool enable_statistics,
+  uint32_t stats_level,
+  uint64_t wal_ttl_seconds,
+  uint64_t wal_size_limit_mb,
+  bool avoid_flush_during_shutdown,
+  js_array_t wal_filter_prefixes_array
 ) {
   int err;
+
+  std::vector<js_typedarray_t<>> prefix_elements;
+  err = js_get_array_elements(env, wal_filter_prefixes_array, prefix_elements);
+  assert(err == 0);
+
+  const auto wal_filter_prefixes_len = prefix_elements.size();
+
+  rocksdb_slice_t *wal_filter_prefixes = nullptr;
+
+  if (wal_filter_prefixes_len > 0) {
+    wal_filter_prefixes = reinterpret_cast<rocksdb_slice_t *>(malloc(wal_filter_prefixes_len * sizeof(rocksdb_slice_t)));
+
+    for (size_t i = 0; i < wal_filter_prefixes_len; i++) {
+      rocksdb_slice_t prefix;
+      err = js_get_typedarray_info(env, prefix_elements[i], prefix.data, prefix.len);
+      assert(err == 0);
+
+      auto data = reinterpret_cast<char *>(malloc(prefix.len));
+      memcpy(data, prefix.data, prefix.len);
+
+      wal_filter_prefixes[i].data = data;
+      wal_filter_prefixes[i].len = prefix.len;
+    }
+  }
 
   js_arraybuffer_t handle;
 
@@ -380,26 +442,35 @@ rocksdb_native_init(
   db->closing = false;
   db->exiting = false;
 
+  db->wal_filter_prefixes = wal_filter_prefixes;
+  db->wal_filter_prefixes_len = wal_filter_prefixes_len;
+
   new (&db->column_families) std::set<rocksdb_native_column_family_t *>();
   new (&db->snapshots) std::set<rocksdb_native_snapshot_t *>();
 
-  db->options = (rocksdb_options_t) {
-    5,
-    read_only,
-    create_if_missing,
-    create_missing_column_families,
-    max_background_jobs,
-    bytes_per_sync,
-    max_open_files,
-    use_direct_reads,
-    avoid_unnecessary_blocking_io,
-    skip_stats_update_on_db_open,
-    use_direct_io_for_flush_and_compaction,
-    max_file_opening_threads,
-    -1,
-    rocksdb_wal_recovery_mode_t(wal_recovery_mode),
-    best_efforts_recovery,
-  };
+  rocksdb_options_init(&db->options, 8);
+
+  db->options.read_only = read_only;
+  db->options.create_if_missing = create_if_missing;
+  db->options.create_missing_column_families = create_missing_column_families;
+  db->options.max_background_jobs = max_background_jobs;
+  db->options.bytes_per_sync = bytes_per_sync;
+  db->options.max_open_files = max_open_files;
+  db->options.use_direct_reads = use_direct_reads;
+  db->options.avoid_unnecessary_blocking_io = avoid_unnecessary_blocking_io;
+  db->options.skip_stats_update_on_db_open = skip_stats_update_on_db_open;
+  db->options.use_direct_io_for_flush_and_compaction = use_direct_io_for_flush_and_compaction;
+  db->options.max_file_opening_threads = max_file_opening_threads;
+  db->options.lock = -1;
+  db->options.wal_recovery_mode = rocksdb_wal_recovery_mode_t(wal_recovery_mode);
+  db->options.best_efforts_recovery = best_efforts_recovery;
+  db->options.enable_statistics = enable_statistics;
+  db->options.stats_level = rocksdb_stats_level_t(stats_level);
+  db->options.wal_ttl_seconds = wal_ttl_seconds;
+  db->options.wal_size_limit_mb = wal_size_limit_mb;
+  db->options.avoid_flush_during_shutdown = avoid_flush_during_shutdown;
+  db->options.wal_filter_prefixes = db->wal_filter_prefixes;
+  db->options.wal_filter_prefixes_len = db->wal_filter_prefixes_len;
 
   return handle;
 }
@@ -1643,13 +1714,13 @@ rocksdb_native_compact_range(
   req->env = env;
   req->handle.data = req;
 
-  rocksdb_compact_range_options_t options = {
-    .version = 1,
-    .exclusive_manual_compaction = exclusive,
-    .blob_garbage_collection_policy = rocksdb_blob_garbage_collection_policy_t(blob_garbage_collection_policy),
-    .blob_garbage_collection_age_cutoff = blob_garbage_collection_age_cutoff,
-    .bottommost_level_compaction = rocksdb_bottommost_level_compaction_t(bottommost_level_compaction),
-  };
+  rocksdb_compact_range_options_t options;
+  rocksdb_compact_range_options_init(&options, 1);
+
+  options.exclusive_manual_compaction = exclusive;
+  options.blob_garbage_collection_policy = rocksdb_blob_garbage_collection_policy_t(blob_garbage_collection_policy);
+  options.blob_garbage_collection_age_cutoff = blob_garbage_collection_age_cutoff;
+  options.bottommost_level_compaction = rocksdb_bottommost_level_compaction_t(bottommost_level_compaction);
 
   err = rocksdb_compact_range(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, &options, rocksdb_native__on_compact_range);
 
@@ -1664,6 +1735,98 @@ rocksdb_native_compact_range(
   assert(err == 0);
 
   err = js_create_reference(env, on_compact_range, req->on_compact_range);
+  assert(err == 0);
+
+  return handle;
+}
+
+static void
+rocksdb_native__on_compact(rocksdb_compact_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  auto req = reinterpret_cast<rocksdb_native_compact_t *>(handle->data);
+
+  auto db = reinterpret_cast<rocksdb_native_t *>(req->handle.req.db);
+
+  auto env = req->env;
+
+  js_handle_scope_t *scope;
+  err = js_open_handle_scope(env, &scope);
+  assert(err == 0);
+
+  js_receiver_t ctx;
+  err = js_get_reference_value(env, req->ctx, ctx);
+  assert(err == 0);
+
+  rocksdb_native_on_compact_t cb;
+  err = js_get_reference_value(env, req->on_compact, cb);
+  assert(err == 0);
+
+  req->on_compact.reset();
+  req->ctx.reset();
+
+  std::optional<js_object_t> error;
+
+  if (req->handle.error) {
+    err = js_create_error(env, uv_err_name(req->handle.status), req->handle.error, error.emplace());
+    assert(err == 0);
+  }
+
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error);
+    (void) err;
+  }
+
+  err = js_close_handle_scope(env, scope);
+  assert(err == 0);
+}
+
+static js_arraybuffer_t
+rocksdb_native_compact(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
+  js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family,
+  bool exclusive,
+  uint32_t blob_garbage_collection_policy,
+  double blob_garbage_collection_age_cutoff,
+  uint32_t bottommost_level_compaction,
+  js_receiver_t ctx,
+  rocksdb_native_on_compact_t on_compact
+) {
+  int err;
+
+  js_arraybuffer_t handle;
+
+  rocksdb_native_compact_t *req;
+  err = js_create_arraybuffer(env, req, handle);
+  assert(err == 0);
+
+  req->env = env;
+  req->handle.data = req;
+
+  rocksdb_compact_range_options_t options;
+  rocksdb_compact_range_options_init(&options, 1);
+
+  options.exclusive_manual_compaction = exclusive;
+  options.blob_garbage_collection_policy = rocksdb_blob_garbage_collection_policy_t(blob_garbage_collection_policy);
+  options.blob_garbage_collection_age_cutoff = blob_garbage_collection_age_cutoff;
+  options.bottommost_level_compaction = rocksdb_bottommost_level_compaction_t(bottommost_level_compaction);
+
+  err = rocksdb_compact(&db->handle, &req->handle, column_family->handle, &options, rocksdb_native__on_compact);
+
+  if (err < 0) {
+    err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
+
+  err = js_create_reference(env, ctx, req->ctx);
+  assert(err == 0);
+
+  err = js_create_reference(env, on_compact, req->on_compact);
   assert(err == 0);
 
   return handle;
@@ -1744,12 +1907,12 @@ rocksdb_native_approximate_size(
   req->env = env;
   req->handle.data = req;
 
-  rocksdb_approximate_size_options_t options = {
-    .version = 0,
-    .include_memtables = include_memtables,
-    .include_files = include_files,
-    .files_size_error_margin = error_margin,
-  };
+  rocksdb_approximate_size_options_t options;
+  rocksdb_approximate_size_options_init(&options, 0);
+
+  options.include_memtables = include_memtables;
+  options.include_files = include_files;
+  options.files_size_error_margin = error_margin;
 
   err = rocksdb_approximate_size(&db->handle, &req->handle, column_family->handle, start_slice, end_slice, &options, rocksdb_native__on_approximate_size);
 
@@ -1767,6 +1930,118 @@ rocksdb_native_approximate_size(
   assert(err == 0);
 
   return handle;
+}
+
+static void
+rocksdb_native__on_current_wal_file(rocksdb_current_wal_file_t *handle, int status) {
+  int err;
+
+  assert(status == 0);
+
+  auto req = reinterpret_cast<rocksdb_native_current_wal_file_t *>(handle->data);
+
+  auto db = reinterpret_cast<rocksdb_native_t *>(req->handle.req.db);
+
+  auto env = req->env;
+
+  js_handle_scope_t *scope;
+  err = js_open_handle_scope(env, &scope);
+  assert(err == 0);
+
+  js_receiver_t ctx;
+  err = js_get_reference_value(env, req->ctx, ctx);
+  assert(err == 0);
+
+  rocksdb_native_on_current_wal_file_t cb;
+  err = js_get_reference_value(env, req->on_current_wal_file, cb);
+  assert(err == 0);
+
+  req->on_current_wal_file.reset();
+  req->ctx.reset();
+
+  std::optional<js_object_t> error;
+
+  if (req->handle.error) {
+    err = js_create_error(env, uv_err_name(req->handle.status), req->handle.error, error.emplace());
+    assert(err == 0);
+  }
+
+  auto &file = req->handle.result;
+
+  if (!db->exiting) {
+    err = js_call_function_with_checkpoint(env, cb, ctx, error, file.path, file.number, uint32_t(file.type), file.start_sequence, file.size);
+    (void) err;
+  }
+
+  err = js_close_handle_scope(env, scope);
+  assert(err == 0);
+}
+
+static js_arraybuffer_t
+rocksdb_native_current_wal_file(
+  js_env_t *env,
+  js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
+  js_receiver_t ctx,
+  rocksdb_native_on_current_wal_file_t on_current_wal_file
+) {
+  int err;
+
+  js_arraybuffer_t handle;
+
+  rocksdb_native_current_wal_file_t *req;
+  err = js_create_arraybuffer(env, req, handle);
+  assert(err == 0);
+
+  req->env = env;
+  req->handle.data = req;
+
+  err = rocksdb_current_wal_file(&db->handle, &req->handle, rocksdb_native__on_current_wal_file);
+
+  if (err < 0) {
+    err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
+
+  err = js_create_reference(env, ctx, req->ctx);
+  assert(err == 0);
+
+  err = js_create_reference(env, on_current_wal_file, req->on_current_wal_file);
+  assert(err == 0);
+
+  return handle;
+}
+
+static uint32_t
+rocksdb_native_stats_level_get(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_t, 1> db) {
+  int err;
+
+  rocksdb_stats_level_t level;
+  err = rocksdb_stats_level_get(&db->handle, &level);
+
+  if (err < 0) {
+    err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
+
+  return uint32_t(level);
+}
+
+static void
+rocksdb_native_stats_level_set(js_env_t *env, js_arraybuffer_span_of_t<rocksdb_native_t, 1> db, uint32_t level) {
+  int err;
+
+  err = rocksdb_stats_level_set(&db->handle, rocksdb_stats_level_t(level));
+
+  if (err < 0) {
+    err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
 }
 
 static js_arraybuffer_t
@@ -1840,9 +2115,14 @@ rocksdb_native_exports(js_env_t *env, js_value_t *exports) {
   V("iteratorClose", rocksdb_native_iterator_close)
   V("iteratorRead", rocksdb_native_iterator_read)
 
+  V("statsLevelGet", rocksdb_native_stats_level_get)
+  V("statsLevelSet", rocksdb_native_stats_level_set)
+
   V("flush", rocksdb_native_flush)
+  V("compact", rocksdb_native_compact)
   V("compactRange", rocksdb_native_compact_range)
   V("approximateSize", rocksdb_native_approximate_size)
+  V("currentWalFile", rocksdb_native_current_wal_file)
 
   V("snapshotCreate", rocksdb_native_snapshot_create)
   V("snapshotDestroy", rocksdb_native_snapshot_destroy)

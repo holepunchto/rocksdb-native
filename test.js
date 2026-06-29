@@ -1340,4 +1340,137 @@ test('diagnostics reflects state', async (t) => {
   }
 })
 
+test('compact', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('aa', 'aa')
+  batch.put('ab', 'ab')
+  batch.put('ba', 'ba')
+  batch.put('bb', 'bb')
+  batch.put('ac', 'ac')
+  await batch.flush()
+  batch.destroy()
+
+  await db.compact()
+  await db.compact({ exclusive: true })
+
+  t.pass()
+
+  await db.close()
+})
+
+test('current WAL file', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  batch.put('hello', 'world')
+  await batch.flush()
+  batch.destroy()
+
+  const wal = await db.currentWalFile()
+
+  t.ok(typeof wal.path === 'string' && wal.path.length > 0, 'has a path')
+  t.ok(Number.isInteger(wal.number), 'has a log number')
+  t.is(wal.type, RocksDB.constants.walFileType.ALIVE)
+  t.ok(Number.isInteger(wal.startSequence), 'has a start sequence')
+  t.ok(Number.isInteger(wal.size), 'has a size')
+
+  await db.close()
+})
+
+test('statistics + stats level', async (t) => {
+  const db = new RocksDB(await t.tmp(), {
+    enableStatistics: true,
+    statsLevel: RocksDB.constants.statsLevel.ALL
+  })
+  await db.ready()
+
+  t.is(await db.getStatsLevel(), RocksDB.constants.statsLevel.ALL)
+
+  await db.setStatsLevel(RocksDB.constants.statsLevel.EXCEPT_TIMERS)
+
+  t.is(await db.getStatsLevel(), RocksDB.constants.statsLevel.EXCEPT_TIMERS)
+
+  await db.close()
+})
+
+test('stats level without statistics enabled', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await t.exception(db.getStatsLevel())
+
+  await db.close()
+})
+
+test('open read-only with WAL filter prefixes', async (t) => {
+  const dir = await t.tmp()
+
+  const w = new RocksDB(dir)
+  await w.ready()
+
+  const batch = w.write()
+  batch.put('aa', 'aa')
+  batch.put('bb', 'bb')
+  await batch.flush()
+  batch.destroy()
+
+  const r = new RocksDB(dir, {
+    readOnly: true,
+    walFilterPrefixes: ['a']
+  })
+  await r.ready()
+
+  t.alike(await r.get('aa'), Buffer.from('aa'))
+
+  await w.close()
+  await r.close()
+})
+
+test('read-only WAL filter excludes unmatched prefixes', async (t) => {
+  const dir = await t.tmp()
+
+  // Keep the writes in the WAL so that the filter applies during replay rather
+  // than reading flushed values back from an SST file.
+  const w = new RocksDB(dir, { avoidFlushDuringShutdown: true })
+  await w.ready()
+
+  const batch = w.write()
+  batch.put('a', 'a')
+  batch.put('b', 'b')
+  await batch.flush()
+  batch.destroy()
+
+  await w.close()
+
+  const r = new RocksDB(dir, {
+    readOnly: true,
+    walFilterPrefixes: ['a']
+  })
+  await r.ready()
+
+  t.alike(await r.get('a'), Buffer.from('a'))
+  t.is(await r.get('b'), null)
+
+  await r.close()
+})
+
+test('WAL database options', async (t) => {
+  const db = new RocksDB(await t.tmp(), {
+    walTtlSeconds: 60,
+    walSizeLimitMegabytes: 16,
+    avoidFlushDuringShutdown: true
+  })
+  await db.ready()
+
+  await db.put('hello', 'world')
+
+  t.alike(await db.get('hello'), Buffer.from('world'))
+
+  await db.close()
+})
+
 function noop() {}
