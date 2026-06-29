@@ -182,6 +182,12 @@ class RocksDB {
     await batch.flush()
   }
 
+  async compact(opts = {}) {
+    maybeClosed(this)
+
+    await this._state.compact(this, opts)
+  }
+
   async compactRange(start = null, end = null, opts = {}) {
     if (typeof end === 'object' && end !== null) {
       opts = end
@@ -197,6 +203,24 @@ class RocksDB {
 
   async approximateSize(start, end, opts = {}) {
     return this._state.approximateSize(this, start, end, opts)
+  }
+
+  async currentWalFile() {
+    maybeClosed(this)
+
+    return this._state.currentWalFile()
+  }
+
+  async getStatsLevel() {
+    maybeClosed(this)
+
+    return this._state.getStatsLevel()
+  }
+
+  async setStatsLevel(level) {
+    maybeClosed(this)
+
+    await this._state.setStatsLevel(level)
   }
 
   _ref() {
