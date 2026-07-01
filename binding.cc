@@ -267,6 +267,8 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
     }
   }
 
+  rocksdb_open_cleanup(&req->handle);
+
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
     (void) err;
@@ -328,6 +330,8 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
   auto env = req->env;
 
   auto teardown = db->teardown;
+
+  rocksdb_close_cleanup(&req->handle);
 
   if (db->closing) {
     js_handle_scope_t *scope;
@@ -630,6 +634,8 @@ rocksdb_native__on_suspend(rocksdb_suspend_t *handle, int status) {
     assert(err == 0);
   }
 
+  rocksdb_suspend_cleanup(&req->handle);
+
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
     (void) err;
@@ -708,6 +714,8 @@ rocksdb_native__on_resume(rocksdb_resume_t *handle, int status) {
     err = js_create_error(env, uv_err_name(req->handle.status), req->handle.error, error.emplace());
     assert(err == 0);
   }
+
+  rocksdb_resume_cleanup(&req->handle);
 
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
@@ -940,6 +948,8 @@ rocksdb_native__on_iterator_close(rocksdb_iterator_t *handle, int status) {
     assert(err == 0);
   }
 
+  rocksdb_iterator_cleanup(&req->handle);
+
   if (!req->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
     (void) err;
@@ -980,6 +990,8 @@ rocksdb_native__on_iterator_open(rocksdb_iterator_t *handle, int status) {
     err = js_create_error(env, uv_err_name(req->handle.status), req->handle.error, error.emplace());
     assert(err == 0);
   }
+
+  rocksdb_iterator_cleanup(&req->handle);
 
   if (!req->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
@@ -1152,6 +1164,8 @@ rocksdb_native__on_iterator_read(rocksdb_iterator_t *handle, int status) {
     }
   }
 
+  rocksdb_iterator_cleanup(&req->handle);
+
   if (!req->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error, keys, values);
     (void) err;
@@ -1284,6 +1298,8 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
       }
     }
   }
+
+  rocksdb_read_cleanup(&req->handle);
 
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, errors, values);
@@ -1443,6 +1459,8 @@ rocksdb_native__on_write(rocksdb_write_batch_t *handle, int status) {
     assert(err == 0);
   }
 
+  rocksdb_write_cleanup(&req->handle);
+
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
     (void) err;
@@ -1592,6 +1610,8 @@ rocksdb_native__on_flush(rocksdb_flush_t *handle, int status) {
     assert(err == 0);
   }
 
+  rocksdb_flush_cleanup(&req->handle);
+
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
     (void) err;
@@ -1671,6 +1691,8 @@ rocksdb_native__on_compact_range(rocksdb_compact_range_t *handle, int status) {
     err = js_create_error(env, uv_err_name(req->handle.status), req->handle.error, error.emplace());
     assert(err == 0);
   }
+
+  rocksdb_compact_range_cleanup(&req->handle);
 
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
@@ -1774,6 +1796,8 @@ rocksdb_native__on_compact(rocksdb_compact_t *handle, int status) {
     assert(err == 0);
   }
 
+  rocksdb_compact_cleanup(&req->handle);
+
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error);
     (void) err;
@@ -1865,6 +1889,8 @@ rocksdb_native__on_approximate_size(rocksdb_approximate_size_t *handle, int stat
     err = js_create_error(env, uv_err_name(req->handle.status), req->handle.error, error.emplace());
     assert(err == 0);
   }
+
+  rocksdb_approximate_size_cleanup(&req->handle);
 
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error, req->handle.result);
@@ -1967,6 +1993,8 @@ rocksdb_native__on_current_wal_file(rocksdb_current_wal_file_t *handle, int stat
   }
 
   auto &file = req->handle.result;
+
+  rocksdb_current_wal_file_cleanup(&req->handle);
 
   if (!db->exiting) {
     err = js_call_function_with_checkpoint(env, cb, ctx, error, file.path, file.number, uint32_t(file.type), file.start_sequence, file.size);
