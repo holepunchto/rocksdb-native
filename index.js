@@ -2,7 +2,6 @@ const ColumnFamily = require('./lib/column-family')
 const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
 const State = require('./lib/state')
-const binding = require('./binding')
 const { BloomFilterPolicy, RibbonFilterPolicy } = require('./lib/filter-policy')
 const constants = require('./lib/constants')
 
@@ -48,10 +47,6 @@ class RocksDB {
 
   get defaultColumnFamily() {
     return this._columnFamily
-  }
-
-  get statistics() {
-    return this.propertyGet('rocksdb.options-statistics')
   }
 
   session({
@@ -228,10 +223,16 @@ class RocksDB {
     await this._state.setStatsLevel(level)
   }
 
-  propertyGet(name) {
+  async propertyGet(name) {
     maybeClosed(this)
-    return binding.propertyGet(this._state._handle, name)
+
+    return this._state.propertyGet(name)
   }
+
+  async statistics() {
+    return this.propertyGet('rocksdb.options-statistics')
+  }
+
 
   _ref() {
     if (this._snapshot) this._snapshot.ref()

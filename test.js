@@ -1308,8 +1308,7 @@ test.solo('statistics via propertyGet', async (t) => {
   })
   await db.ready()
 
-  let stats = db.statistics
-  console.log(stats)
+  let stats = await db.statistics()
   t.is(stats, undefined, 'not enabled')
 
   await db.close()
@@ -1318,8 +1317,7 @@ test.solo('statistics via propertyGet', async (t) => {
     enableStatistics: true
   })
 
-  stats = db.propertyGet('rocksdb.options-statistics')
-  console.log(stats)
+  stats = await db.statistics()
   t.is(typeof stats, 'string', 'stats enabled')
   t.ok(stats.includes('rocksdb.block.cache.hit COUNT'))
   t.ok(stats.includes('rocksdb.block.cache.miss COUNT'))
