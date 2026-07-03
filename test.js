@@ -1288,21 +1288,28 @@ test('stats', async (t) => {
   await db.close()
 })
 
-test('propertyValue', async (t) => {
-  const db = new RocksDB(await t.tmp(), {
-    enableStatistics: true
-  })
+test('propertyGet', async (t) => {
+  const db = new RocksDB(await t.tmp())
   await db.ready()
 
-  const stats = db.propertyGet('rocksdb.options-statistics')
-  t.is(typeof stats, 'string')
-  t.ok(stats.includes('rocksdb.block.cache.hit COUNT'))
-  t.ok(stats.includes('rocksdb.block.cache.miss COUNT'))
+  {
+    const batch = db.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    batch.destroy()
+    await p
+  }
+
+  const nKeys = await db.propertyGet('rocksdb.estimate-num-keys')
+
+  t.is(typeof nKeys, 'string')
+  t.is(parseInt(nKeys), 1)
+
 
   await db.close()
 })
 
-test.solo('statistics via propertyGet', async (t) => {
+test('statistics via propertyGet', async (t) => {
   let db = new RocksDB(await t.tmp(), {
     enableStatistics: false
   })
