@@ -223,6 +223,12 @@ class RocksDB {
     await this._state.setStatsLevel(level)
   }
 
+  async getProperty(name) {
+    maybeClosed(this)
+
+    return this._state.getProperty(name)
+  }
+
   _ref() {
     if (this._snapshot) this._snapshot.ref()
     this._state.handles.inc()
