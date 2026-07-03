@@ -233,7 +233,6 @@ class RocksDB {
     return this.propertyGet('rocksdb.options-statistics')
   }
 
-
   _ref() {
     if (this._snapshot) this._snapshot.ref()
     this._state.handles.inc()
