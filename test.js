@@ -1305,7 +1305,6 @@ test('propertyGet', async (t) => {
   t.is(typeof nKeys, 'string')
   t.is(parseInt(nKeys), 1)
 
-
   await db.close()
 })
 
