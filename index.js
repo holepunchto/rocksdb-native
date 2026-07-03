@@ -223,14 +223,10 @@ class RocksDB {
     await this._state.setStatsLevel(level)
   }
 
-  async propertyGet(name) {
+  async getProperty(name) {
     maybeClosed(this)
 
-    return this._state.propertyGet(name)
-  }
-
-  async statistics() {
-    return this.propertyGet('rocksdb.options-statistics')
+    return this._state.getProperty(name)
   }
 
   _ref() {
