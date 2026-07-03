@@ -50,6 +50,10 @@ class RocksDB {
     return this._columnFamily
   }
 
+  get statistics() {
+    return this.propertyGet('rocksdb.options-statistics')
+  }
+
   session({
     columnFamily = this._columnFamily,
     snapshot = this._snapshot !== null,
@@ -227,7 +231,6 @@ class RocksDB {
   propertyGet(name) {
     maybeClosed(this)
     return binding.propertyGet(this._state._handle, name)
-
   }
 
   _ref() {

@@ -1302,6 +1302,31 @@ test('propertyValue', async (t) => {
   await db.close()
 })
 
+test.solo('statistics via propertyGet', async (t) => {
+  let db = new RocksDB(await t.tmp(), {
+    enableStatistics: false
+  })
+  await db.ready()
+
+  let stats = db.statistics
+  console.log(stats)
+  t.is(stats, undefined, 'not enabled')
+
+  await db.close()
+
+  db = new RocksDB(await t.tmp(), {
+    enableStatistics: true
+  })
+
+  stats = db.propertyGet('rocksdb.options-statistics')
+  console.log(stats)
+  t.is(typeof stats, 'string', 'stats enabled')
+  t.ok(stats.includes('rocksdb.block.cache.hit COUNT'))
+  t.ok(stats.includes('rocksdb.block.cache.miss COUNT'))
+
+  await db.close()
+})
+
 test('diagnostics reflects state', async (t) => {
   const db = new RocksDB(await t.tmp())
   t.teardown(() => db.close())
