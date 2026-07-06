@@ -293,6 +293,9 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
 
     column_family->handle = nullptr;
 
+    delete[] const_cast<char *>(column_family->descriptor.name);
+    column_family->descriptor.name = nullptr;
+
     column_family->ctx.reset();
   }
 
@@ -530,6 +533,8 @@ rocksdb_native_open(
   db->options.lock = lock;
 
   err = rocksdb_open(loop, &db->handle, &req->handle, path, &db->options, column_families, handles, len, nullptr, rocksdb_native__on_open);
+
+  delete[] path;
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
@@ -856,6 +861,9 @@ rocksdb_native_column_family_destroy(
   js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family
 ) {
   int err;
+
+  delete[] const_cast<char *>(column_family->descriptor.name);
+  column_family->descriptor.name = nullptr;
 
   if (column_family->handle == nullptr) return;
 
