@@ -34,7 +34,7 @@ jobs:
     name: Test / ${{ matrix.platform }}-${{ matrix.arch }}
     steps:
       - uses: holepunchto/actions/node-base@v1
-      - uses: holepunchto/actions/compile-bare@ec7eb9efb1e40058525de2530904ed37d6c2bad6
+      - uses: holepunchto/actions/compile-bare@9a12adc5ba9e863f8e6572ef0d0475326137e959
         with:
           flags: --debug ${{ matrix.flags }}
       - uses: holepunchto/actions/compile-prebuilds@v1
