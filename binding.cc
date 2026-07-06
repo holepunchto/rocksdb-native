@@ -31,6 +31,8 @@ struct rocksdb_native_column_family_t {
   rocksdb_column_family_t *handle;
   rocksdb_column_family_descriptor_t descriptor;
 
+  std::string name;
+
   rocksdb_native_t *db;
 
   js_persistent_t<js_arraybuffer_t> ctx;
@@ -293,8 +295,7 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
 
     column_family->handle = nullptr;
 
-    delete[] const_cast<char *>(column_family->descriptor.name);
-    column_family->descriptor.name = nullptr;
+    column_family->name.~basic_string();
 
     column_family->ctx.reset();
   }
@@ -487,7 +488,7 @@ rocksdb_native_open(
   js_env_t *env,
   js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
   js_receiver_t self,
-  char *path,
+  std::string path,
   js_array_t column_families_array,
   int lock,
   js_receiver_t ctx,
@@ -532,9 +533,7 @@ rocksdb_native_open(
 
   db->options.lock = lock;
 
-  err = rocksdb_open(loop, &db->handle, &req->handle, path, &db->options, column_families, handles, len, nullptr, rocksdb_native__on_open);
-
-  delete[] path;
+  err = rocksdb_open(loop, &db->handle, &req->handle, path.c_str(), &db->options, column_families, handles, len, nullptr, rocksdb_native__on_open);
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
@@ -770,7 +769,7 @@ rocksdb_native_resume(
 static js_arraybuffer_t
 rocksdb_native_column_family_init(
   js_env_t *env,
-  char *name,
+  std::string name,
   bool enable_blob_files,
   uint64_t min_blob_size,
   uint64_t blob_file_size,
@@ -826,8 +825,10 @@ rocksdb_native_column_family_init(
   column_family->db = nullptr;
   column_family->handle = nullptr;
 
+  new (&column_family->name) std::string(std::move(name));
+
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
-    name,
+    column_family->name.c_str(),
     {
       5,
       rocksdb_level_compaction,
@@ -862,17 +863,16 @@ rocksdb_native_column_family_destroy(
 ) {
   int err;
 
-  delete[] const_cast<char *>(column_family->descriptor.name);
-  column_family->descriptor.name = nullptr;
-
   if (column_family->handle == nullptr) return;
 
   err = rocksdb_column_family_destroy(&column_family->db->handle, column_family->handle);
   assert(err == 0);
 
+  column_family->db->column_families.erase(column_family);
+
   column_family->handle = nullptr;
 
-  column_family->db->column_families.erase(column_family);
+  column_family->name.~basic_string();
 
   column_family->ctx.reset();
 }
