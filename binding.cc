@@ -31,6 +31,8 @@ struct rocksdb_native_column_family_t {
   rocksdb_column_family_t *handle;
   rocksdb_column_family_descriptor_t descriptor;
 
+  std::string name;
+
   rocksdb_native_t *db;
 
   js_persistent_t<js_arraybuffer_t> ctx;
@@ -293,8 +295,7 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
 
     column_family->handle = nullptr;
 
-    delete[] const_cast<char *>(column_family->descriptor.name);
-    column_family->descriptor.name = nullptr;
+    column_family->name.~basic_string();
 
     column_family->ctx.reset();
   }
@@ -768,7 +769,7 @@ rocksdb_native_resume(
 static js_arraybuffer_t
 rocksdb_native_column_family_init(
   js_env_t *env,
-  char *name,
+  std::string name,
   bool enable_blob_files,
   uint64_t min_blob_size,
   uint64_t blob_file_size,
@@ -824,8 +825,10 @@ rocksdb_native_column_family_init(
   column_family->db = nullptr;
   column_family->handle = nullptr;
 
+  new (&column_family->name) std::string(std::move(name));
+
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
-    name,
+    column_family->name.c_str(),
     {
       5,
       rocksdb_level_compaction,
@@ -860,8 +863,7 @@ rocksdb_native_column_family_destroy(
 ) {
   int err;
 
-  delete[] const_cast<char *>(column_family->descriptor.name);
-  column_family->descriptor.name = nullptr;
+  column_family->name.~basic_string();
 
   if (column_family->handle == nullptr) return;
 
