@@ -487,7 +487,7 @@ rocksdb_native_open(
   js_env_t *env,
   js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
   js_receiver_t self,
-  char *path,
+  std::string path,
   js_array_t column_families_array,
   int lock,
   js_receiver_t ctx,
@@ -532,9 +532,7 @@ rocksdb_native_open(
 
   db->options.lock = lock;
 
-  err = rocksdb_open(loop, &db->handle, &req->handle, path, &db->options, column_families, handles, len, nullptr, rocksdb_native__on_open);
-
-  delete[] path;
+  err = rocksdb_open(loop, &db->handle, &req->handle, path.c_str(), &db->options, column_families, handles, len, nullptr, rocksdb_native__on_open);
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));
