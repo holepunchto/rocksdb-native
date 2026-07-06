@@ -863,16 +863,16 @@ rocksdb_native_column_family_destroy(
 ) {
   int err;
 
-  column_family->name.~basic_string();
-
   if (column_family->handle == nullptr) return;
 
   err = rocksdb_column_family_destroy(&column_family->db->handle, column_family->handle);
   assert(err == 0);
 
+  column_family->db->column_families.erase(column_family);
+
   column_family->handle = nullptr;
 
-  column_family->db->column_families.erase(column_family);
+  column_family->name.~basic_string();
 
   column_family->ctx.reset();
 }
