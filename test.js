@@ -1288,6 +1288,49 @@ test('stats', async (t) => {
   await db.close()
 })
 
+test('getProperty', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  {
+    const batch = db.write()
+    const p = batch.put('hello', 'world')
+    await batch.flush()
+    batch.destroy()
+    await p
+  }
+
+  const nKeys = await db.getProperty('rocksdb.estimate-num-keys')
+
+  t.is(typeof nKeys, 'string')
+  t.is(parseInt(nKeys), 1)
+
+  await db.close()
+})
+
+test('enableStatistics populates property', async (t) => {
+  let db = new RocksDB(await t.tmp(), {
+    enableStatistics: false
+  })
+  await db.ready()
+
+  let stats = await db.getProperty('rocksdb.options-statistics')
+  t.is(stats, undefined, 'not enabled')
+
+  await db.close()
+
+  db = new RocksDB(await t.tmp(), {
+    enableStatistics: true
+  })
+
+  stats = await db.getProperty('rocksdb.options-statistics')
+  t.is(typeof stats, 'string', 'stats enabled')
+  t.ok(stats.includes('rocksdb.block.cache.hit COUNT'))
+  t.ok(stats.includes('rocksdb.block.cache.miss COUNT'))
+
+  await db.close()
+})
+
 test('diagnostics reflects state', async (t) => {
   const db = new RocksDB(await t.tmp())
   t.teardown(() => db.close())
