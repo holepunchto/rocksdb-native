@@ -26,6 +26,7 @@ jobs:
           - os: macos-latest
             platform: darwin
             arch: arm64
+            flags: --sanitize address
           - os: windows-latest
             platform: win32
             arch: x64
@@ -33,7 +34,7 @@ jobs:
     name: Test / ${{ matrix.platform }}-${{ matrix.arch }}
     steps:
       - uses: holepunchto/actions/node-base@v1
-      - uses: holepunchto/actions/compile-bare@9a12adc5ba9e863f8e6572ef0d0475326137e959
+      - uses: holepunchto/actions/compile-bare@v1
         with:
           flags: --debug ${{ matrix.flags }}
       - uses: holepunchto/actions/compile-prebuilds@v1
