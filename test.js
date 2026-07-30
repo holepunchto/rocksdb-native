@@ -941,6 +941,61 @@ test('suspend + write', async (t) => {
   await db.close()
 })
 
+test('write while suspending', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const busy = db.write()
+  busy.tryPut('busy', 'value')
+  const busyFlushed = busy.flush()
+
+  const suspending = db.suspend()
+
+  let flushed = false
+  const batch = db.write()
+  const p = batch.put('hello', 'world')
+  batch.flush().then(() => (flushed = true))
+
+  await busyFlushed
+  busy.destroy()
+  await suspending
+
+  t.is(flushed, false)
+
+  await db.resume()
+  await p
+  batch.destroy()
+  await db.close()
+})
+
+test('read while suspending', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const busy = db.write()
+  busy.tryPut('hello', 'world')
+  const busyFlushed = busy.flush()
+
+  const suspending = db.suspend()
+
+  let flushed = false
+  const batch = db.read()
+  const p = batch.get('hello')
+  batch.flush().then(() => (flushed = true))
+
+  await busyFlushed
+  busy.destroy()
+  await suspending
+
+  t.is(flushed, false)
+
+  await db.resume()
+  t.alike(await p, Buffer.from('world'))
+  batch.destroy()
+
+  await db.close()
+})
+
 test('suspend + write + resume + suspend before fully resumed', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
