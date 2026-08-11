@@ -58,6 +58,7 @@ struct rocksdb_native_t {
 
   bool closing;
   bool exiting;
+  bool opening;
 
   std::set<rocksdb_native_column_family_t *> column_families;
   std::set<rocksdb_native_snapshot_t *> snapshots;
@@ -204,6 +205,9 @@ rocksdb_native__try_create_external_arraybuffer(js_env_t *env, char *data, size_
 }
 
 static void
+rocksdb_native__close_deferred(rocksdb_native_t *db);
+
+static void
 rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
   int err;
 
@@ -212,6 +216,8 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
   auto req = reinterpret_cast<rocksdb_native_open_t *>(handle->data);
 
   auto db = reinterpret_cast<rocksdb_native_t *>(req->handle.req.db);
+
+  db->opening = false;
 
   auto env = req->env;
 
@@ -281,6 +287,8 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 
   delete[] descriptors;
   delete[] handles;
+
+  if (db->exiting && !db->closing) rocksdb_native__close_deferred(db);
 }
 
 static void
@@ -371,24 +379,29 @@ rocksdb_native__on_close(rocksdb_close_t *handle, int status) {
 }
 
 static void
-rocksdb_native__on_teardown(js_deferred_teardown_t *teardown, void *data) {
+rocksdb_native__close_deferred(rocksdb_native_t *db) {
   int err;
 
+  auto req = new rocksdb_native_close_t();
+
+  req->env = db->env;
+  req->handle.data = req;
+
+  err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_idle, rocksdb_native__on_close);
+  assert(err == 0);
+}
+
+static void
+rocksdb_native__on_teardown(js_deferred_teardown_t *teardown, void *data) {
   auto db = reinterpret_cast<rocksdb_native_t *>(data);
 
   db->exiting = true;
 
   if (db->closing) return;
 
-  auto env = db->env;
+  if (db->opening) return; // close is issued from on_open once the open settles
 
-  auto req = new rocksdb_native_close_t();
-
-  req->env = env;
-  req->handle.data = req;
-
-  err = rocksdb_close(&db->handle, &req->handle, rocksdb_native__on_idle, rocksdb_native__on_close);
-  assert(err == 0);
+  rocksdb_native__close_deferred(db);
 }
 
 static js_arraybuffer_t
@@ -449,6 +462,7 @@ rocksdb_native_init(
   db->env = env;
   db->closing = false;
   db->exiting = false;
+  db->opening = false;
 
   db->wal_filter_prefixes = wal_filter_prefixes;
   db->wal_filter_prefixes_len = wal_filter_prefixes_len;
@@ -547,6 +561,8 @@ rocksdb_native_open(
 
     throw js_pending_exception;
   }
+
+  db->opening = true;
 
   err = js_create_reference(env, self, db->ctx);
   assert(err == 0);
