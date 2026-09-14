@@ -805,7 +805,8 @@ rocksdb_native_column_family_init(
   int32_t num_levels,
   int32_t max_write_buffer_number,
   double blob_garbage_collection_age_cutoff,
-  double blob_garbage_collection_force_threshold
+  double blob_garbage_collection_force_threshold,
+  uint64_t write_buffer_size
 ) {
   int err;
 
@@ -846,7 +847,7 @@ rocksdb_native_column_family_init(
   column_family->descriptor = (rocksdb_column_family_descriptor_t) {
     column_family->name.c_str(),
     {
-      5,
+      6,
       rocksdb_level_compaction,
       enable_blob_files,
       min_blob_size,
@@ -866,6 +867,7 @@ rocksdb_native_column_family_init(
       max_write_buffer_number,
       blob_garbage_collection_age_cutoff,
       blob_garbage_collection_force_threshold,
+      write_buffer_size,
     }
   };
 
