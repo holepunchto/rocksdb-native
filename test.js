@@ -1560,7 +1560,8 @@ test('WAL database options', async (t) => {
   const db = new RocksDB(await t.tmp(), {
     walTtlSeconds: 60,
     walSizeLimitMegabytes: 16,
-    avoidFlushDuringShutdown: true
+    avoidFlushDuringShutdown: true,
+    writeBufferSize: 1024 * 1024
   })
   await db.ready()
 
