@@ -1186,6 +1186,91 @@ test('suspend + flush + resume', async (t) => {
   await db.close()
 })
 
+test('suspend + stats + resume', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await db.put('hello', 'world')
+
+  const size = await db.approximateSize('a', 'z', { includeMemtables: true })
+  const nKeys = await db.getProperty('rocksdb.estimate-num-keys')
+  const wal = await db.currentWalFile()
+
+  await db.suspend()
+
+  const calls = [
+    settled(db, db.approximateSize('a', 'z', { includeMemtables: true })),
+    settled(db, db.getProperty('rocksdb.estimate-num-keys')),
+    settled(db, db.currentWalFile())
+  ]
+
+  await db.resume()
+
+  t.alike(await Promise.all(calls), [
+    { beforeResume: false, value: size },
+    { beforeResume: false, value: nKeys },
+    { beforeResume: false, value: wal }
+  ])
+
+  await db.close()
+})
+
+test('stats while suspending', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await db.put('hello', 'world')
+
+  const size = await db.approximateSize('a', 'z', { includeMemtables: true })
+  const nKeys = await db.getProperty('rocksdb.estimate-num-keys')
+  const wal = await db.currentWalFile()
+
+  // Already running when suspend starts, so suspend has to wait for it
+  const inflight = db.approximateSize('a', 'z', { includeMemtables: true })
+
+  const suspending = db.suspend()
+
+  const draining = db.diagnostics()
+  t.ok(draining.resumedPending && !draining.suspended && draining.io > 0, 'suspend is draining io')
+
+  const calls = [
+    settled(db, db.approximateSize('a', 'z', { includeMemtables: true })),
+    settled(db, db.getProperty('rocksdb.estimate-num-keys')),
+    settled(db, db.currentWalFile())
+  ]
+
+  t.is(db.diagnostics().io, draining.io, 'waiting calls hold no io')
+
+  t.is(await inflight, size)
+  await suspending
+  t.is(db.diagnostics().suspended, true)
+
+  await db.resume()
+
+  t.alike(await Promise.all(calls), [
+    { beforeResume: false, value: size },
+    { beforeResume: false, value: nKeys },
+    { beforeResume: false, value: wal }
+  ])
+
+  await db.close()
+})
+
+test('suspend + stats + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.suspend()
+
+  const calls = [
+    t.exception(db.approximateSize('a', 'z'), /RocksDB session is closed/),
+    t.exception(db.getProperty('rocksdb.estimate-num-keys'), /RocksDB session is closed/),
+    t.exception(db.currentWalFile(), /RocksDB session is closed/)
+  ]
+
+  await db.close()
+  await Promise.all(calls)
+})
+
 test('fd lock', async (t) => {
   const fd = fs.openSync('test/fixtures/lock', 'w+')
 
@@ -1588,3 +1673,13 @@ test('WAL database options', async (t) => {
 })
 
 function noop() {}
+
+// A call that settles before resume got past the suspend
+async function settled(db, promise) {
+  try {
+    const value = await promise
+    return { beforeResume: db.diagnostics().resumedPending, value }
+  } catch (err) {
+    return { beforeResume: db.diagnostics().resumedPending, error: err.message }
+  }
+}
