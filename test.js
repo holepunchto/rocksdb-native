@@ -1448,6 +1448,21 @@ test('getProperty', async (t) => {
   await db.close()
 })
 
+test('getProperty, column family', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  const cf = db.columnFamily('a')
+
+  await cf.put('hello', 'world')
+  await cf.flush()
+
+  t.ok(parseInt(await cf.getProperty('rocksdb.total-sst-files-size')) > 0)
+  t.is(parseInt(await db.getProperty('rocksdb.total-sst-files-size')), 0)
+  t.is(await cf.getProperty('rocksdb.unknown-property'), undefined)
+
+  await cf.close()
+  await db.close()
+})
+
 test('enableStatistics populates property', async (t) => {
   let db = new RocksDB(await t.tmp(), {
     enableStatistics: false
