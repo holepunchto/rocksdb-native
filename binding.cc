@@ -2102,10 +2102,11 @@ static std::optional<std::string>
 rocksdb_native_property_get(
   js_env_t *env,
   js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
+  js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family,
   std::string name
 ) {
   rocksdb_slice_t value;
-  int err = rocksdb_property_get(&db->handle, name.c_str(), &value);
+  int err = rocksdb_column_family_property_get(&db->handle, column_family->handle, name.c_str(), &value);
 
   if (err == UV_ENOENT) return std::nullopt;
   assert(err == 0);

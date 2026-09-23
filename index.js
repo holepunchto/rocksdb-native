@@ -226,7 +226,7 @@ class RocksDB {
   async getProperty(name) {
     maybeClosed(this)
 
-    return this._state.getProperty(name)
+    return this._state.getProperty(this, name)
   }
 
   _ref() {
