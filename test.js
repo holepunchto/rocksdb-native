@@ -1506,7 +1506,7 @@ test('getUsage counts writes that have not been flushed', async (t) => {
 
   const after = await db.getUsage()
 
-  t.ok(after.families.default.memtableBytes > before.families.default.memtableBytes)
+  t.ok(after.families.default.memtableMemoryBytes > before.families.default.memtableMemoryBytes)
   t.ok(after.families.default.keyCount > 0)
 
   await db.close()
@@ -1536,7 +1536,7 @@ test('getUsage returns a number for every field', async (t) => {
 
   const { families } = await db.getUsage()
 
-  t.alike(Object.keys(families.default), ['keyCount', 'liveDataBytes', 'memtableBytes'])
+  t.alike(Object.keys(families.default), ['keyCount', 'liveDataBytes', 'memtableMemoryBytes'])
   t.ok(Object.values(families.default).every(Number.isFinite))
 
   await db.close()
