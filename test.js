@@ -1502,7 +1502,7 @@ test('getUsage counts writes that have not been flushed', async (t) => {
 
   const before = await db.getUsage()
 
-  await db.put('hello', 'world')
+  await db.put('big', Buffer.alloc(65536))
 
   const after = await db.getUsage()
 
@@ -1524,6 +1524,7 @@ test('getUsage includes live data held in blob files', async (t) => {
   const { families } = await db.getUsage()
 
   t.ok(families.blobs.liveDataBytes >= 65536)
+  t.ok(families.blobs.liveDataBytes < 131072)
 
   await blobs.close()
   await db.close()

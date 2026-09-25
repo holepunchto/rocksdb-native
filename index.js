@@ -229,6 +229,12 @@ class RocksDB {
     return this._state.getProperty(name, this)
   }
 
+  async getUsage() {
+    maybeClosed(this)
+
+    return this._state.getUsage()
+  }
+
   _ref() {
     if (this._snapshot) this._snapshot.ref()
     this._state.handles.inc()
