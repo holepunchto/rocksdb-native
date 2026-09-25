@@ -1475,6 +1475,101 @@ test('getProperty, column family', async (t) => {
   await db.close()
 })
 
+test('getUsage reports every column family', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  const a = db.columnFamily('a')
+  const b = db.columnFamily('b')
+
+  await a.put('hello', 'world')
+  await a.flush()
+
+  const { families } = await db.getUsage()
+
+  t.alike(Object.keys(families).sort(), ['a', 'b', 'default'])
+  t.ok(families.a.keyCount > 0)
+  t.ok(families.a.liveDataBytes > 0)
+  t.is(families.b.keyCount, 0)
+  t.is(families.b.liveDataBytes, 0)
+
+  await a.close()
+  await b.close()
+  await db.close()
+})
+
+test('getUsage counts writes that have not been flushed', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const before = await db.getUsage()
+
+  await db.put('hello', 'world')
+
+  const after = await db.getUsage()
+
+  t.ok(after.families.default.memtableBytes > before.families.default.memtableBytes)
+  t.ok(after.families.default.keyCount > 0)
+
+  await db.close()
+})
+
+test('getUsage includes live data held in blob files', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  const blobs = db.columnFamily(
+    new RocksDB.ColumnFamily('blobs', { enableBlobFiles: true, minBlobSize: 1024 })
+  )
+
+  await blobs.put('big', Buffer.alloc(65536))
+  await blobs.flush()
+
+  const { families } = await db.getUsage()
+
+  t.ok(families.blobs.liveDataBytes >= 65536)
+
+  await blobs.close()
+  await db.close()
+})
+
+test('getUsage returns a number for every field', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.put('hello', 'world')
+
+  const { families } = await db.getUsage()
+
+  t.alike(Object.keys(families.default), ['keyCount', 'liveDataBytes', 'memtableBytes'])
+  t.ok(Object.values(families.default).every(Number.isFinite))
+
+  await db.close()
+})
+
+test('suspend + getUsage + resume', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.put('hello', 'world')
+  await db.suspend()
+
+  const call = settled(db, db.getUsage())
+
+  await db.resume()
+
+  const { beforeResume, value } = await call
+
+  t.is(beforeResume, false)
+  t.ok(value.families.default)
+
+  await db.close()
+})
+
+test('suspend + getUsage + close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.suspend()
+
+  const call = t.exception(db.getUsage(), /RocksDB session is closed/)
+
+  await db.close()
+  await call
+})
+
 test('enableStatistics populates property', async (t) => {
   let db = new RocksDB(await t.tmp(), {
     enableStatistics: false
