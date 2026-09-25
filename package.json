@@ -51,6 +51,8 @@
     "bare": ">=1.16.0"
   },
   "dependencies": {
+    "bare-fs": "^4.5.0",
+    "bare-path": "^3.0.0",
     "compact-encoding": "^3.0.0",
     "ready-resource": "^1.0.0",
     "refcounter": "^1.0.0",
@@ -62,8 +64,6 @@
   "devDependencies": {
     "bare-compat-napi": "^1.4.1",
     "bare-crypto": "^1.12.0",
-    "bare-fs": "^4.5.0",
-    "bare-path": "^3.0.0",
     "brittle": "^3.5.0",
     "cmake-bare": "^1.1.14",
     "cmake-fetch": "^1.0.1",
