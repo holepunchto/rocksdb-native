@@ -1271,6 +1271,18 @@ test('suspend + stats + close', async (t) => {
   await Promise.all(calls)
 })
 
+test('approximateSize releases io when a key fails to encode', async (t) => {
+  const db = new RocksDB(await t.tmp(), { keyEncoding: c.fixed32 })
+  await db.ready()
+
+  await t.exception(db.approximateSize(Buffer.alloc(1), Buffer.alloc(1)))
+
+  await db.suspend()
+  await db.resume()
+
+  await db.close()
+})
+
 test('fd lock', async (t) => {
   const fd = fs.openSync('test/fixtures/lock', 'w+')
 
