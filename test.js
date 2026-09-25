@@ -1688,6 +1688,45 @@ test('suspend + getDiskUsage + close', async (t) => {
   await call
 })
 
+test('getDiskUsage with files walks the database directory', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  const blobs = db.columnFamily(
+    new RocksDB.ColumnFamily('blobs', { enableBlobFiles: true, minBlobSize: 1024 })
+  )
+
+  await db.put('hello', 'world')
+  await db.flush()
+  await blobs.put('big', Buffer.alloc(65536))
+  await blobs.flush()
+
+  const { families, files } = await db.getDiskUsage({ files: true })
+  const familySstBytes = Object.values(families).reduce((sum, family) => sum + family.sstBytes, 0)
+  const familyBlobBytes = Object.values(families).reduce((sum, family) => sum + family.blobBytes, 0)
+
+  t.alike(Object.keys(files), [
+    'totalBytes',
+    'totalFiles',
+    'sstBytes',
+    'sstFiles',
+    'blobBytes',
+    'blobFiles',
+    'walBytes',
+    'walFiles',
+    'otherBytes',
+    'otherFiles'
+  ])
+  t.is(files.totalBytes, files.sstBytes + files.blobBytes + files.walBytes + files.otherBytes)
+  t.is(files.totalFiles, files.sstFiles + files.blobFiles + files.walFiles + files.otherFiles)
+  t.ok(files.sstBytes >= familySstBytes)
+  t.ok(files.blobBytes >= familyBlobBytes)
+  t.ok(files.blobFiles > 0)
+  t.ok(files.walFiles >= 1)
+  t.ok(files.otherFiles > 0)
+
+  await blobs.close()
+  await db.close()
+})
+
 test('enableStatistics populates property', async (t) => {
   let db = new RocksDB(await t.tmp(), {
     enableStatistics: false
