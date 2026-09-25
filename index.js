@@ -235,6 +235,12 @@ class RocksDB {
     return this._state.getUsage()
   }
 
+  async getDiskUsage() {
+    maybeClosed(this)
+
+    return this._state.getDiskUsage()
+  }
+
   _ref() {
     if (this._snapshot) this._snapshot.ref()
     this._state.handles.inc()
