@@ -235,10 +235,10 @@ class RocksDB {
     return this._state.getUsage()
   }
 
-  async getDiskUsage() {
+  async getDiskUsage(opts) {
     maybeClosed(this)
 
-    return this._state.getDiskUsage()
+    return this._state.getDiskUsage(opts)
   }
 
   _ref() {
