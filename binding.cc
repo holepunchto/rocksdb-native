@@ -840,7 +840,6 @@ static js_arraybuffer_t
 rocksdb_native_flush_wal(
   js_env_t *env,
   js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
-  bool sync,
   js_receiver_t ctx,
   rocksdb_native_on_flush_wal_t on_flush_wal
 ) {
@@ -855,7 +854,7 @@ rocksdb_native_flush_wal(
   req->env = env;
   req->handle.data = req;
 
-  err = rocksdb_flush_wal(&db->handle, &req->handle, sync, rocksdb_native__on_flush_wal);
+  err = rocksdb_flush_wal(&db->handle, &req->handle, true, rocksdb_native__on_flush_wal);
 
   if (err < 0) {
     err = js_throw_error(env, uv_err_name(err), uv_strerror(err));

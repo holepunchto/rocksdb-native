@@ -211,10 +211,10 @@ class RocksDB {
     return this._state.currentWalFile()
   }
 
-  async flushWAL(opts) {
+  async flushWAL() {
     maybeClosed(this)
 
-    return this._state.flushWAL(opts)
+    return this._state.flushWAL()
   }
 
   async getStatsLevel() {
