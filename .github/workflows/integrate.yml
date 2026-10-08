@@ -27,20 +27,21 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: x64
-            source: true
             flags: --sanitize address
           - os: macos-latest
             platform: darwin
             arch: arm64
+            flags: --sanitize address
           - os: windows-latest
             platform: win32
             arch: x64
+            flags: --sanitize address
     runs-on: ${{ matrix.os }}
     name: Test / ${{ matrix.platform }}-${{ matrix.arch }}
     steps:
       - uses: holepunchto/actions/bare-base@v1
         with:
-          source: ${{ matrix.source }}
+          source: true
           flags: --debug ${{ matrix.flags }}
       - uses: holepunchto/actions/compile-prebuilds@v1
         with:
@@ -49,4 +50,4 @@ jobs:
           flags: --debug ${{ matrix.flags }}
       - run: npm test
         env:
-          LSAN_OPTIONS: suppressions=test/leaks.txt
+          ASAN_OPTIONS: detect_leaks=${{ matrix.platform == 'win32' && '0' || '1' }}
