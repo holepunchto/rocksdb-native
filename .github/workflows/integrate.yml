@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: holepunchto/actions/node-base@v1
       - run: npm run lint
-  test:
+  test-bare:
     strategy:
       matrix:
         include:
@@ -32,11 +32,13 @@ jobs:
           - os: macos-latest
             platform: darwin
             arch: arm64
+            source: true
+            flags: --sanitize address
           - os: windows-latest
             platform: win32
             arch: x64
     runs-on: ${{ matrix.os }}
-    name: Test / ${{ matrix.platform }}-${{ matrix.arch }}
+    name: Test / Bare / ${{ matrix.platform }}-${{ matrix.arch }}
     steps:
       - uses: holepunchto/actions/bare-base@v1
         with:
@@ -47,6 +49,30 @@ jobs:
           platform: ${{ matrix.platform }}
           arch: ${{ matrix.arch }}
           flags: --debug ${{ matrix.flags }}
-      - run: npm test
+      - run: npm run test:bare
         env:
+          ASAN_OPTIONS: detect_leaks=${{ matrix.platform == 'win32' && '0' || '1' }}
           LSAN_OPTIONS: suppressions=test/leaks.txt
+  test-node:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    name: Test / Node.js / ${{ matrix.platform }}-${{ matrix.arch }}
+    steps:
+      - uses: holepunchto/actions/node-base@v1
+      - uses: holepunchto/actions/compile-prebuilds@v1
+        with:
+          platform: ${{ matrix.platform }}
+          arch: ${{ matrix.arch }}
+          flags: --debug
+      - run: npm run test:node

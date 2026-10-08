@@ -193,6 +193,13 @@ static int
 rocksdb_native__try_create_external_arraybuffer(js_env_t *env, char *data, size_t len, js_arraybuffer_t &result) {
   int err;
 
+  if (data == nullptr) {
+    err = js_create_arraybuffer(env, len, result);
+    assert(err == 0);
+
+    return 0;
+  }
+
   err = js_create_external_arraybuffer<rocksdb_native__on_free>(env, data, len, result);
   if (err == 0) return 0;
 
