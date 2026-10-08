@@ -345,6 +345,59 @@ test('manual compaction', async (t) => {
   await db.close()
 })
 
+test('manual compaction, buffer keys', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  for (const keys of [
+    ['a', 'b', 'c'],
+    ['m', 'n', 'o'],
+    ['x', 'y', 'z']
+  ]) {
+    for (const key of keys) await db.put(key, key)
+    await db.flush()
+  }
+
+  t.is(await db.getProperty('rocksdb.num-files-at-level0'), '3')
+
+  await db.compactRange(Buffer.from('x'))
+
+  t.is(await db.getProperty('rocksdb.num-files-at-level0'), '2')
+
+  await db.compactRange(Buffer.from('a'), Buffer.from('c'))
+
+  t.is(await db.getProperty('rocksdb.num-files-at-level0'), '1')
+
+  await db.close()
+})
+
+test('manual compaction, buffer keys with options', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await db.put('a', 'a')
+  await db.put('b', 'b')
+  await db.flush()
+
+  const snapshot = db.snapshot()
+
+  await db.put('a', 'aa')
+  await db.flush()
+
+  await db.compactRange()
+  await snapshot.close()
+
+  t.is(await db.getProperty('rocksdb.estimate-num-keys'), '3')
+
+  await db.compactRange(Buffer.from('a'), Buffer.from('b'), {
+    bottommostLevelCompaction: RocksDB.constants.bottommostLevelCompaction.FORCE
+  })
+
+  t.is(await db.getProperty('rocksdb.estimate-num-keys'), '2')
+
+  await db.close()
+})
+
 test('approximate size', async (t) => {
   t.plan(2)
 
