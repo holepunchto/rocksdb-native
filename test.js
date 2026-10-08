@@ -1725,6 +1725,102 @@ test('WAL database options', async (t) => {
   await db.close()
 })
 
+test('flushWAL', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await db.put('hello', 'world')
+  await db.flushWAL()
+
+  t.alike(await db.get('hello'), Buffer.from('world'))
+
+  await db.close()
+})
+
+test('flushWAL debounces concurrent calls', async (t) => {
+  const binding = require('./binding')
+  const flushWal = binding.flushWal
+
+  let calls = 0
+  binding.flushWal = function (...args) {
+    calls++
+    return flushWal.apply(this, args)
+  }
+  t.teardown(() => {
+    binding.flushWal = flushWal
+  })
+
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await db.put('hello', 'world')
+
+  const first = db.flushWAL()
+  await new Promise(setImmediate)
+
+  const rest = []
+  for (let i = 0; i < 10; i++) rest.push(db.flushWAL())
+
+  await first
+  await Promise.all(rest)
+
+  t.is(calls, 2)
+
+  await db.close()
+})
+
+test('flushWAL + close waits for the flush', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await db.put('hello', 'world')
+
+  const p = db.flushWAL()
+  await db.close()
+
+  await t.execution(p)
+})
+
+test('flushWAL after close', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.close()
+
+  await t.exception(db.flushWAL())
+})
+
+test('suspend + flushWAL + resume', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await db.put('hello', 'world')
+  await db.suspend()
+
+  const p = db.flushWAL()
+  await db.resume()
+
+  await t.execution(p)
+  await db.close()
+})
+
+test('flushWAL before ready', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.flushWAL()
+  await db.close()
+})
+
+test('suspend + flushWAL + close without resume', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+  await db.suspend()
+
+  const p = db.flushWAL()
+  p.catch(noop)
+
+  await db.close()
+  await t.exception(p)
+})
+
 function noop() {}
 
 // A call that settles before resume got past the suspend
