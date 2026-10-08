@@ -28,12 +28,12 @@ jobs:
             platform: linux
             arch: x64
             source: true
-            flags: --sanitize
+            flags: --sanitize address
           - os: macos-latest
             platform: darwin
             arch: arm64
             source: true
-            flags: --sanitize
+            flags: --sanitize address
           - os: windows-latest
             platform: win32
             arch: x64
