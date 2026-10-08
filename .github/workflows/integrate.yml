@@ -49,5 +49,4 @@ jobs:
           flags: --debug ${{ matrix.flags }}
       - run: npm test
         env:
-          ASAN_OPTIONS: fast_unwind_on_malloc=0
-          LSAN_OPTIONS: suppressions=test/leaks.txt:report_objects=1
+          LSAN_OPTIONS: suppressions=test/leaks.txt
