@@ -1,0 +1,4 @@
+# https://github.com/libuv/libuv/pull/5289
+leak:uv__set_process_title
+
+leak:_dispatch_continuation_alloc_from_heap

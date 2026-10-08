@@ -48,6 +48,7 @@ jobs:
       - run: npm run test:bare
         env:
           ASAN_OPTIONS: detect_leaks=${{ matrix.platform == 'win32' && '0' || '1' }}
+          LSAN_OPTIONS: suppressions=test/leaks.txt
   test-node:
     strategy:
       matrix:
