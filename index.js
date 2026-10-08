@@ -189,10 +189,10 @@ class RocksDB {
   }
 
   async compactRange(start = null, end = null, opts = {}) {
-    if (typeof end === 'object' && end !== null) {
+    if (typeof end === 'object' && end !== null && !ArrayBuffer.isView(end)) {
       opts = end
       end = null
-    } else if (typeof start === 'object' && start !== null) {
+    } else if (typeof start === 'object' && start !== null && !ArrayBuffer.isView(start)) {
       opts = start
       start = null
       end = null
