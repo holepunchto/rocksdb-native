@@ -913,6 +913,15 @@ test('suspend + resume + write', async (t) => {
   await db.close()
 })
 
+test('suspend while opening + resume + read', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  db.ready()
+  await db.suspend()
+  await db.resume()
+  t.is(await db.get('hello'), null)
+  await db.close()
+})
+
 test('suspend + write + flush + close', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
