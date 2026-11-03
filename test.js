@@ -1402,10 +1402,9 @@ test('batch flush rejects when open fails', async (t) => {
   const batch = locked.read()
   const get = batch.get('hello')
 
-  await t.exception(batch.flush())
-  await t.exception(get)
-  await t.exception(locked.get('hello'))
+  const calls = [t.exception(batch.flush()), t.exception(get), t.exception(locked.get('hello'))]
 
+  await Promise.all(calls)
   await db.close()
 })
 
