@@ -1383,7 +1383,7 @@ test('compactRange releases io when a key fails to encode', async (t) => {
   const db = new RocksDB(await t.tmp(), { keyEncoding: c.fixed32 })
   await db.ready()
 
-  await t.exception(db.compactRange('a', 'b'))
+  await t.exception(db.compactRange(Buffer.alloc(1), Buffer.alloc(1)))
 
   await db.suspend()
   await db.resume()
