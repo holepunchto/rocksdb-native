@@ -1433,12 +1433,87 @@ rocksdb_native__on_read(rocksdb_read_batch_t *handle, int status) {
   assert(err == 0);
 }
 
+// Batches pass their operations as a structure of arrays: a flat uint32 array with
+// `stride` words per op, a list of backing ArrayBuffers and a list of column family
+// handles. Word 0 is `type << 24 | column family index`, every slice after it is
+// `buffer index, byte offset, byte length`. See lib/batch.js.
+
+static constexpr uint32_t rocksdb_native__slice_bits = 24;
+
+struct rocksdb_native_batch_buffers_t {
+  std::vector<char *> data;
+  std::vector<size_t> len;
+  std::vector<rocksdb_column_family_t *> column_families;
+};
+
+static void
+rocksdb_native__get_batch_buffers(js_env_t *env, js_array_t buffers, js_array_t column_families, rocksdb_native_batch_buffers_t &result) {
+  int err;
+
+  std::vector<js_arraybuffer_t> buffer_elements;
+  err = js_get_array_elements(env, buffers, buffer_elements);
+  assert(err == 0);
+
+  const auto buffers_len = buffer_elements.size();
+
+  result.data.resize(buffers_len);
+  result.len.resize(buffers_len);
+
+  for (size_t i = 0; i < buffers_len; i++) {
+    err = js_get_arraybuffer_info(env, buffer_elements[i], result.data[i], result.len[i]);
+    assert(err == 0);
+  }
+
+  std::vector<js_arraybuffer_t> column_family_elements;
+  err = js_get_array_elements(env, column_families, column_family_elements);
+  assert(err == 0);
+
+  const auto column_families_len = column_family_elements.size();
+
+  result.column_families.resize(column_families_len);
+
+  for (size_t i = 0; i < column_families_len; i++) {
+    rocksdb_native_column_family_t *column_family;
+    err = js_get_arraybuffer_info(env, column_family_elements[i], column_family);
+    assert(err == 0);
+
+    result.column_families[i] = column_family->handle;
+  }
+}
+
+static bool
+rocksdb_native__get_slice(const rocksdb_native_batch_buffers_t &buffers, const uint32_t *words, rocksdb_slice_t &result) {
+  const auto index = words[0];
+  const size_t offset = words[1];
+  const size_t len = words[2];
+
+  if (index >= buffers.data.size() || offset + len > buffers.len[index]) return false;
+
+  result.data = buffers.data[index] + offset;
+  result.len = len;
+
+  return true;
+}
+
+static void
+rocksdb_native__throw_invalid_batch(js_env_t *env) {
+  int err;
+
+  err = js_throw_error(env, "INVALID_BATCH", "Batch operation is out of range");
+  assert(err == 0);
+
+  throw js_pending_exception;
+}
+
 static void
 rocksdb_native_read(
   js_env_t *env,
   js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
   js_arraybuffer_span_of_t<rocksdb_native_read_batch_t, 1> req,
-  js_array_t operations,
+  js_typedarray_span_t<uint32_t> operations,
+  uint32_t len,
+  js_array_t buffers,
+  js_array_t column_families,
   std::optional<js_arraybuffer_span_of_t<rocksdb_native_snapshot_t, 1>> snapshot,
   bool async_io,
   bool fill_cache,
@@ -1447,44 +1522,31 @@ rocksdb_native_read(
 ) {
   int err;
 
-  std::vector<js_object_t> elements;
-  err = js_get_array_elements(env, operations, elements);
-  assert(err == 0);
+  constexpr size_t stride = 4;
 
-  const auto len = elements.size();
+  if (len > req->capacity || size_t(len) * stride > operations.size()) rocksdb_native__throw_invalid_batch(env);
+
+  rocksdb_native_batch_buffers_t resolved;
+  rocksdb_native__get_batch_buffers(env, buffers, column_families, resolved);
 
   for (uint32_t i = 0; i < len; i++) {
-    js_object_t read = elements[i];
+    const uint32_t *words = &operations[i * stride];
 
-    rocksdb_read_type_t type;
-    err = js_get_property(env, read, "type", reinterpret_cast<uint32_t &>(type));
-    assert(err == 0);
+    auto type = rocksdb_read_type_t(words[0] >> rocksdb_native__slice_bits);
+    auto column_family = words[0] & ((1u << rocksdb_native__slice_bits) - 1);
+
+    if (column_family >= resolved.column_families.size()) rocksdb_native__throw_invalid_batch(env);
 
     req->reads[i].type = type;
-
-    js_arraybuffer_t column_family_property;
-    err = js_get_property(env, read, "columnFamily", column_family_property);
-    assert(err == 0);
-
-    rocksdb_native_column_family_t *column_family;
-    err = js_get_arraybuffer_info(env, column_family_property, column_family);
-    assert(err == 0);
-
-    req->reads[i].column_family = column_family->handle;
+    req->reads[i].column_family = resolved.column_families[column_family];
 
     switch (type) {
-    case rocksdb_get: {
-      js_typedarray_t property;
-
-      rocksdb_slice_t *key = &req->reads[i].key;
-
-      err = js_get_property(env, read, "key", property);
-      assert(err == 0);
-
-      err = js_get_typedarray_info(env, property, key->data, key->len);
-      assert(err == 0);
+    case rocksdb_get:
+      if (!rocksdb_native__get_slice(resolved, &words[1], req->reads[i].key)) rocksdb_native__throw_invalid_batch(env);
       break;
-    }
+
+    default:
+      rocksdb_native__throw_invalid_batch(env);
     }
   }
 
@@ -1598,89 +1660,55 @@ rocksdb_native_write(
   js_env_t *env,
   js_arraybuffer_span_of_t<rocksdb_native_t, 1> db,
   js_arraybuffer_span_of_t<rocksdb_native_write_batch_t, 1> req,
-  js_array_t operations,
+  js_typedarray_span_t<uint32_t> operations,
+  uint32_t len,
+  js_array_t buffers,
+  js_array_t column_families,
   js_receiver_t ctx,
   rocksdb_native_on_write_t on_write
 ) {
   int err;
 
-  std::vector<js_object_t> elements;
-  err = js_get_array_elements(env, operations, elements);
-  assert(err == 0);
+  constexpr size_t stride = 7;
 
-  const auto len = elements.size();
+  if (len > req->capacity || size_t(len) * stride > operations.size()) rocksdb_native__throw_invalid_batch(env);
+
+  rocksdb_native_batch_buffers_t resolved;
+  rocksdb_native__get_batch_buffers(env, buffers, column_families, resolved);
 
   for (uint32_t i = 0; i < len; i++) {
-    js_object_t write = elements[i];
+    const uint32_t *words = &operations[i * stride];
 
-    rocksdb_write_type_t type;
-    err = js_get_property(env, write, "type", reinterpret_cast<uint32_t &>(type));
-    assert(err == 0);
+    auto type = rocksdb_write_type_t(words[0] >> rocksdb_native__slice_bits);
+    auto column_family = words[0] & ((1u << rocksdb_native__slice_bits) - 1);
 
-    req->writes[i].type = type;
+    if (column_family >= resolved.column_families.size()) rocksdb_native__throw_invalid_batch(env);
 
-    js_arraybuffer_t column_family_property;
-    err = js_get_property(env, write, "columnFamily", column_family_property);
-    assert(err == 0);
+    rocksdb_write_t *write = &req->writes[i];
 
-    rocksdb_native_column_family_t *column_family;
-    err = js_get_arraybuffer_info(env, column_family_property, column_family);
-    assert(err == 0);
+    write->type = type;
+    write->column_family = resolved.column_families[column_family];
 
-    req->writes[i].column_family = column_family->handle;
-
-    js_typedarray_t property;
+    bool ok;
 
     switch (type) {
-    case rocksdb_put: {
-      rocksdb_slice_t *key = &req->writes[i].key;
-
-      err = js_get_property(env, write, "key", property);
-      assert(err == 0);
-
-      err = js_get_typedarray_info(env, property, key->data, key->len);
-      assert(err == 0);
-
-      rocksdb_slice_t *value = &req->writes[i].value;
-
-      err = js_get_property(env, write, "value", property);
-      assert(err == 0);
-
-      err = js_get_typedarray_info(env, property, value->data, value->len);
-      assert(err == 0);
+    case rocksdb_put:
+      ok = rocksdb_native__get_slice(resolved, &words[1], write->key) && rocksdb_native__get_slice(resolved, &words[4], write->value);
       break;
-    }
 
-    case rocksdb_delete: {
-      rocksdb_slice_t *key = &req->writes[i].key;
-
-      err = js_get_property(env, write, "key", property);
-      assert(err == 0);
-
-      err = js_get_typedarray_info(env, property, key->data, key->len);
-      assert(err == 0);
+    case rocksdb_delete:
+      ok = rocksdb_native__get_slice(resolved, &words[1], write->key);
       break;
-    }
 
-    case rocksdb_delete_range: {
-      rocksdb_slice_t *start = &req->writes[i].start;
-
-      err = js_get_property(env, write, "start", property);
-      assert(err == 0);
-
-      err = js_get_typedarray_info(env, property, start->data, start->len);
-      assert(err == 0);
-
-      rocksdb_slice_t *end = &req->writes[i].end;
-
-      err = js_get_property(env, write, "end", property);
-      assert(err == 0);
-
-      err = js_get_typedarray_info(env, property, end->data, end->len);
-      assert(err == 0);
+    case rocksdb_delete_range:
+      ok = rocksdb_native__get_slice(resolved, &words[1], write->start) && rocksdb_native__get_slice(resolved, &words[4], write->end);
       break;
+
+    default:
+      ok = false;
     }
-    }
+
+    if (!ok) rocksdb_native__throw_invalid_batch(env);
   }
 
   err = rocksdb_write(&db->handle, &req->handle, req->writes, len, nullptr, rocksdb_native__on_write);
