@@ -1899,3 +1899,41 @@ async function settled(db, promise) {
     return { beforeResume: db.diagnostics().resumedPending, error: err.message }
   }
 }
+
+test('write batch rejects an operation whose buffer was detached', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.write()
+  const value = new Uint8Array(4)
+  const p = batch.put('hello', value)
+  value.buffer.transfer()
+
+  await t.exception(batch.flush(), /Batch operation is out of range/)
+  await t.exception(p, /Batch operation is out of range/)
+  batch.destroy()
+
+  const read = db.read()
+  const missing = read.get('hello')
+  await read.flush()
+  read.destroy()
+  t.is(await missing, null, 'nothing was written')
+
+  await db.close()
+})
+
+test('read batch rejects an operation whose key was detached', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  const batch = db.read()
+  const key = new Uint8Array(4)
+  const p = batch.get(key)
+  key.buffer.transfer()
+
+  await t.exception(batch.flush(), /Batch operation is out of range/)
+  await t.exception(p, /Batch operation is out of range/)
+  batch.destroy()
+
+  await db.close()
+})
