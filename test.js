@@ -1391,6 +1391,23 @@ test('compactRange releases io when a key fails to encode', async (t) => {
   await db.close()
 })
 
+test('batch flush rejects when open fails', async (t) => {
+  const dir = await t.tmp()
+
+  const db = new RocksDB(dir)
+  await db.ready()
+
+  const locked = new RocksDB(dir)
+
+  const batch = locked.read()
+  const get = batch.get('hello')
+
+  const calls = [t.exception(batch.flush()), t.exception(get), t.exception(locked.get('hello'))]
+
+  await Promise.all(calls)
+  await db.close()
+})
+
 test('fd lock', async (t) => {
   const fd = fs.openSync('test/fixtures/lock', 'w+')
 
