@@ -65,7 +65,7 @@
     "bare-fs": "^4.5.0",
     "bare-path": "^3.0.0",
     "brittle": "^3.5.0",
-    "cmake-bare": "^1.1.14",
+    "cmake-bare": "^1.15.0",
     "cmake-fetch": "^1.0.1",
     "cmake-napi": "^1.0.6",
     "fd-lock": "^2.0.0",
