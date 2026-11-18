@@ -25,6 +25,7 @@
     "binding.cc",
     "binding.js",
     "CMakeLists.txt",
+    "PrivacyInfo.xcprivacy",
     "lib",
     "prebuilds",
     "!prebuilds/android-*/**/*.node"
