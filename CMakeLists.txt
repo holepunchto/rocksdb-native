@@ -12,7 +12,7 @@ bare_target(target)
 fetch_package("github:holepunchto/librocksdb#2030346")
 fetch_package("github:holepunchto/libjstl#7777016")
 
-add_bare_module(rocksdb_native_bare)
+add_bare_module(rocksdb_native_bare INSTALL PRIVACY_MANIFEST PrivacyInfo.xcprivacy)
 
 target_sources(
   ${rocksdb_native_bare}
