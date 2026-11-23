@@ -20,7 +20,7 @@ test('open, path with NUL', async (t) => {
   const dir = await t.tmp()
 
   const db = new RocksDB(`${dir}\0/../other`)
-  await t.exception(db.ready(), /null bytes/)
+  await t.exception.all(db.ready(), /null bytes/)
 
   t.alike(fs.readdirSync(dir), [], 'nothing was created')
 })
