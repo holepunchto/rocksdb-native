@@ -27,7 +27,7 @@ test('open, path with NUL', async (t) => {
 
 test('open, path that is too long', async (t) => {
   const db = new RocksDB(path.join(await t.tmp(), 'a'.repeat(5000)))
-  await t.exception(db.ready(), /ENAMETOOLONG/)
+  await t.exception(db.ready(), /name too long/)
 })
 
 test('write + read', async (t) => {
