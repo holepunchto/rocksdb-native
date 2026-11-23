@@ -30,6 +30,13 @@ test('open, path that is too long', async (t) => {
   await t.exception(db.ready(), /name too long/)
 })
 
+test('column family name with a NUL', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  t.teardown(() => db.close())
+
+  t.exception.all(() => db.columnFamily('a\0b'), TypeError)
+})
+
 test('write + read', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
