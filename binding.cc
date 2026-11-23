@@ -526,6 +526,22 @@ rocksdb_native_open(
 ) {
   int err;
 
+  bool too_long = path.size() >= sizeof(rocksdb_open_t::path);
+
+  if (too_long || path.find('\0') != std::string::npos) {
+    if (lock >= 0) {
+      uv_fs_t fs;
+      err = uv_fs_close(NULL, &fs, lock, NULL);
+      assert(err == 0);
+    }
+
+    if (too_long) err = js_throw_error(env, uv_err_name(UV_ENAMETOOLONG), uv_strerror(UV_ENAMETOOLONG));
+    else err = js_throw_type_error(env, NULL, "Path must not contain null bytes");
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
+
   std::vector<js_arraybuffer_t> elements;
   err = js_get_array_elements(env, column_families_array, elements);
   assert(err == 0);

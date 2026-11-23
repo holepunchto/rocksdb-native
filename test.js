@@ -16,6 +16,20 @@ test('create + close', async (t) => {
   await db.close()
 })
 
+test('open, path with NUL', async (t) => {
+  const dir = await t.tmp()
+
+  const db = new RocksDB(`${dir}\0/../other`)
+  await t.exception(db.ready(), /null bytes/)
+
+  t.alike(fs.readdirSync(dir), [], 'nothing was created')
+})
+
+test('open, path that is too long', async (t) => {
+  const db = new RocksDB(path.join(await t.tmp(), 'a'.repeat(5000)))
+  await t.exception(db.ready(), /ENAMETOOLONG/)
+})
+
 test('write + read', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
