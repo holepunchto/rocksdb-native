@@ -308,6 +308,20 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 }
 
 static void
+rocksdb_native__free_wal_filter_prefixes(rocksdb_native_t *db) {
+  if (db->wal_filter_prefixes) {
+    for (size_t i = 0; i < db->wal_filter_prefixes_len; i++) {
+      free(const_cast<char *>(db->wal_filter_prefixes[i].data));
+    }
+
+    free(db->wal_filter_prefixes);
+
+    db->wal_filter_prefixes = nullptr;
+    db->wal_filter_prefixes_len = 0;
+  }
+}
+
+static void
 rocksdb_native__on_idle(rocksdb_t *handle) {
   int err;
 
@@ -333,16 +347,7 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
   db->column_families.~set();
   db->snapshots.~set();
 
-  if (db->wal_filter_prefixes) {
-    for (size_t i = 0; i < db->wal_filter_prefixes_len; i++) {
-      free(const_cast<char *>(db->wal_filter_prefixes[i].data));
-    }
-
-    free(db->wal_filter_prefixes);
-
-    db->wal_filter_prefixes = nullptr;
-    db->wal_filter_prefixes_len = 0;
-  }
+  rocksdb_native__free_wal_filter_prefixes(db);
 }
 
 static void
@@ -534,6 +539,8 @@ rocksdb_native_open(
       err = uv_fs_close(NULL, &fs, lock, NULL);
       assert(err == 0);
     }
+
+    rocksdb_native__free_wal_filter_prefixes(db);
 
     if (too_long) err = js_throw_error(env, uv_err_name(UV_ENAMETOOLONG), uv_strerror(UV_ENAMETOOLONG));
     else err = js_throw_type_error(env, NULL, "Path must not contain null bytes");
