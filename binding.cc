@@ -308,6 +308,20 @@ rocksdb_native__on_open(rocksdb_open_t *handle, int status) {
 }
 
 static void
+rocksdb_native__free_wal_filter_prefixes(rocksdb_native_t *db) {
+  if (db->wal_filter_prefixes) {
+    for (size_t i = 0; i < db->wal_filter_prefixes_len; i++) {
+      free(const_cast<char *>(db->wal_filter_prefixes[i].data));
+    }
+
+    free(db->wal_filter_prefixes);
+
+    db->wal_filter_prefixes = nullptr;
+    db->wal_filter_prefixes_len = 0;
+  }
+}
+
+static void
 rocksdb_native__on_idle(rocksdb_t *handle) {
   int err;
 
@@ -333,16 +347,7 @@ rocksdb_native__on_idle(rocksdb_t *handle) {
   db->column_families.~set();
   db->snapshots.~set();
 
-  if (db->wal_filter_prefixes) {
-    for (size_t i = 0; i < db->wal_filter_prefixes_len; i++) {
-      free(const_cast<char *>(db->wal_filter_prefixes[i].data));
-    }
-
-    free(db->wal_filter_prefixes);
-
-    db->wal_filter_prefixes = nullptr;
-    db->wal_filter_prefixes_len = 0;
-  }
+  rocksdb_native__free_wal_filter_prefixes(db);
 }
 
 static void
@@ -525,6 +530,24 @@ rocksdb_native_open(
   rocksdb_native_on_open_t on_open
 ) {
   int err;
+
+  bool too_long = path.size() >= sizeof(rocksdb_open_t::path);
+
+  if (too_long || path.find('\0') != std::string::npos) {
+    if (lock >= 0) {
+      uv_fs_t fs;
+      err = uv_fs_close(NULL, &fs, lock, NULL);
+      assert(err == 0);
+    }
+
+    rocksdb_native__free_wal_filter_prefixes(db);
+
+    if (too_long) err = js_throw_error(env, uv_err_name(UV_ENAMETOOLONG), uv_strerror(UV_ENAMETOOLONG));
+    else err = js_throw_type_error(env, NULL, "Path must not contain null bytes");
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
 
   std::vector<js_arraybuffer_t> elements;
   err = js_get_array_elements(env, column_families_array, elements);
@@ -906,6 +929,13 @@ rocksdb_native_column_family_init(
   uint64_t write_buffer_size
 ) {
   int err;
+
+  if (name.find('\0') != std::string::npos) {
+    err = js_throw_type_error(env, NULL, "Name must not contain null bytes");
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
 
   rocksdb_filter_policy_t filter_policy = {rocksdb_filter_policy_type_t(filter_policy_type)};
 
@@ -2202,6 +2232,13 @@ rocksdb_native_property_get(
   js_arraybuffer_span_of_t<rocksdb_native_column_family_t, 1> column_family,
   std::string name
 ) {
+  if (name.find('\0') != std::string::npos) {
+    int err = js_throw_type_error(env, NULL, "Name must not contain null bytes");
+    assert(err == 0);
+
+    throw js_pending_exception;
+  }
+
   rocksdb_slice_t value;
   int err = rocksdb_column_family_property_get(&db->handle, column_family->handle, name.c_str(), &value);
 

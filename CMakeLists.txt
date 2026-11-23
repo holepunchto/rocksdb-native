@@ -9,7 +9,7 @@ project(rocksdb_native C CXX)
 
 bare_target(target)
 
-fetch_package("github:holepunchto/librocksdb#2030346")
+fetch_package("github:holepunchto/librocksdb#918a4eb")
 fetch_package("github:holepunchto/libjstl#7777016")
 
 add_bare_module(rocksdb_native_bare INSTALL PRIVACY_MANIFEST PrivacyInfo.xcprivacy)
