@@ -3,6 +3,7 @@ const Iterator = require('./lib/iterator')
 const Snapshot = require('./lib/snapshot')
 const State = require('./lib/state')
 const { BloomFilterPolicy, RibbonFilterPolicy } = require('./lib/filter-policy')
+const { profiles } = require('./lib/profiles')
 const constants = require('./lib/constants')
 
 class RocksDB {
@@ -253,6 +254,7 @@ class RocksDB {
 module.exports = exports = RocksDB
 
 exports.constants = constants
+exports.profiles = profiles
 
 exports.ColumnFamily = ColumnFamily
 exports.BloomFilterPolicy = BloomFilterPolicy

@@ -2124,6 +2124,67 @@ test('block cache size is not set by default', async (t) => {
   await db.close()
 })
 
+test('profile applies to the default column family', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile' })
+  await db.ready()
+
+  const options = db.defaultColumnFamily._options
+  t.is(options.writeBufferSize, 16 * 1024 * 1024)
+  t.is(options.optimizeFiltersForMemory, true)
+  t.is(options.filterPolicy.type, 2) // Ribbon
+
+  await db.close()
+})
+
+test('explicit options win over the profile', async (t) => {
+  const db = new RocksDB(await t.tmp(), {
+    profile: 'mobile',
+    writeBufferSize: 1024 * 1024
+  })
+  await db.ready()
+
+  const options = db.defaultColumnFamily._options
+  t.is(options.writeBufferSize, 1024 * 1024)
+  t.is(options.optimizeFiltersForMemory, true)
+
+  await db.close()
+})
+
+test('unknown profile throws', async (t) => {
+  t.exception(() => new RocksDB('.', { profile: 'toaster' }), /Unknown RocksDB profile/)
+})
+
+test('profile applies to a standalone column family', async (t) => {
+  const col = new RocksDB.ColumnFamily('tuned', { profile: 'mirror' })
+  t.is(col._options.writeBufferSize, 128 * 1024 * 1024)
+  t.is(col._options.maxWriteBufferNumber, 4)
+  t.is(col._options.filterPolicy.bloomBeforeLevel, 2)
+
+  const db = new RocksDB(await t.tmp(), { columnFamilies: [col] })
+  await db.ready()
+  await db.close()
+})
+
+test('column families created by name inherit the profile', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile' })
+  const session = db.columnFamily('extra')
+  await db.ready()
+
+  t.is(session._columnFamily._options.writeBufferSize, 16 * 1024 * 1024)
+
+  await session.close()
+  await db.close()
+})
+
+test('open + write + read with each profile', async (t) => {
+  for (const profile of Object.keys(RocksDB.profiles)) {
+    const db = new RocksDB(await t.tmp(), { profile })
+    await db.put('hello', 'world')
+    t.alike(await db.get('hello'), Buffer.from('world'), profile)
+    await db.close()
+  }
+})
+
 function noop() {}
 
 // A call that settles before resume got past the suspend

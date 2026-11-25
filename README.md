@@ -24,6 +24,28 @@ r.flush()
 console.log(await p)
 ```
 
+## Profiles
+
+Pass `profile` to get defaults tuned for an environment. Any option you pass explicitly wins over the profile.
+
+```js
+const db = new RocksDB('./example.db', { profile: 'mobile' })
+```
+
+- `desktop` — the library defaults, named so callers can be explicit.
+- `mobile` — memory and fd constrained devices: small write buffers (16 MiB),
+  fewer background jobs, bounded open files, Ribbon filters and
+  memory-optimized filter allocation.
+- `mirror` — long-running servers replicating many cores (e.g. blind mirrors):
+  large write buffers (128 MiB x 4), more compaction parallelism, Ribbon
+  filters below the write-hot levels.
+- `ephemeral` — short-lived minimal-footprint opens (e.g. a notification
+  extension peeking at the DB): no block cache, no filters, direct reads,
+  a single open file. Pair with `readOnly: true` (and `walFilterPrefixes`
+  where applicable).
+
+The presets are exported as `RocksDB.profiles`. A profile applies to both DB-level options and column-family options, including column families created by name and standalone `new RocksDB.ColumnFamily(name, { profile })`.
+
 ## Reclaiming space
 
 `compact()` and `compactRange()` take `reclaim` for when the point of the compaction is to give disk space back, e.g. after deleting a range:
