@@ -1917,7 +1917,7 @@ test('manual compaction, reclaim rewrites the bottommost level', async (t) => {
   await db.close()
 })
 
-test('manual compaction, explicit options win over reclaim', async (t) => {
+test('manual compaction, an explicit bottommost level wins over reclaim', async (t) => {
   const db = new RocksDB(await t.tmp())
   await db.ready()
 
@@ -1943,18 +1943,7 @@ test('manual compaction, explicit options win over reclaim', async (t) => {
 })
 
 test('manual compaction, reclaim collects dead blobs', async (t) => {
-  const columnFamily = new RocksDB.ColumnFamily('default', {
-    enableBlobFiles: true,
-    minBlobSize: 512,
-    blobFileSize: 1024 * 1024,
-    enableBlobGarbageCollection: true
-  })
-
-  const db = new RocksDB(await t.tmp(), { columnFamily })
-  await db.ready()
-
-  await fillKeys(db, 2000, 4096)
-  await db.compactRange()
+  const db = await fillBlobs(t)
 
   const before = await blobSize(db)
   t.ok(before > 0, 'blobs on disk')
@@ -1972,8 +1961,68 @@ test('manual compaction, reclaim collects dead blobs', async (t) => {
   await db.close()
 })
 
+test('manual compaction, explicit blob options win over reclaim', async (t) => {
+  const overrides = [
+    ['policy', { blobGarbageCollectionPolicy: RocksDB.constants.garbageCollectionPolicy.DISABLE }],
+    ['age cutoff', { blobGarbageCollectionAgeCutoff: 0 }]
+  ]
+
+  for (const [name, override] of overrides) {
+    const db = await deadBlobs(t)
+    const before = await blobSize(db)
+
+    await db.compactRange(compactionKey(0), compactionKey(2000), {
+      reclaim: true,
+      ...override
+    })
+
+    t.is(await blobSize(db), before, `the explicit ${name} is honoured`)
+
+    await db.close()
+  }
+
+  // the same compaction without an override does collect, so the assertions
+  // above are not just observing a compaction that had nothing to do
+  const db = await deadBlobs(t)
+  const before = await blobSize(db)
+
+  await db.compactRange(compactionKey(0), compactionKey(2000), { reclaim: true })
+  t.ok((await blobSize(db)) < before, 'reclaim collects without an override')
+
+  await db.close()
+})
+
 function compactionKey(n) {
   return 'k' + n.toString().padStart(5, '0')
+}
+
+async function fillBlobs(t) {
+  const columnFamily = new RocksDB.ColumnFamily('default', {
+    enableBlobFiles: true,
+    minBlobSize: 512,
+    blobFileSize: 1024 * 1024,
+    enableBlobGarbageCollection: true
+  })
+
+  const db = new RocksDB(await t.tmp(), { columnFamily })
+  await db.ready()
+
+  await fillKeys(db, 2000, 4096)
+  await db.compactRange()
+
+  return db
+}
+
+// blobs that a regular compaction leaves behind, as its garbage collection
+// thresholds are not met
+async function deadBlobs(t) {
+  const db = await fillBlobs(t)
+
+  await db.deleteRange(compactionKey(0), compactionKey(1000))
+  await db.flush()
+  await db.compactRange(compactionKey(0), compactionKey(2000))
+
+  return db
 }
 
 async function fillKeys(db, n, size = 1024) {
