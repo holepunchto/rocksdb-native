@@ -3,12 +3,12 @@ cmake_minimum_required(VERSION 4.0)
 find_package(cmake-bare REQUIRED PATHS node_modules/cmake-bare)
 find_package(cmake-fetch REQUIRED PATHS node_modules/cmake-fetch)
 find_package(cmake-napi REQUIRED PATHS node_modules/cmake-napi)
-find_package(cmake-npm REQUIRED PATHS node_modules/cmake-npm)
 
 project(rocksdb_native C CXX)
 
 bare_target(target)
 
+fetch_package("github:holepunchto/libnapish#8cbfe78")
 fetch_package("github:holepunchto/librocksdb#918a4eb")
 fetch_package("github:holepunchto/libjstl#7777016")
 
@@ -38,26 +38,13 @@ target_sources(
     binding.cc
 )
 
-target_compile_definitions(
-  ${rocksdb_native_napi}
-  PRIVATE
-    NAPI_VERSION=9
-)
-
 target_link_libraries(
   ${rocksdb_native_napi}
   PRIVATE
     $<TARGET_OBJECTS:rocksdb>
     jstl
+    napish::static
   PUBLIC
     rocksdb
     rocksdb_facebook
-)
-
-resolve_node_module(bare-compat-napi compat)
-
-target_include_directories(
-  ${rocksdb_native_napi}
-  PRIVATE
-    "${compat}/include"
 )
