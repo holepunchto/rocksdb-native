@@ -1926,6 +1926,159 @@ test('suspend + flushWAL + close without resume', async (t) => {
   await t.exception(p)
 })
 
+test('manual compaction, reclaim rewrites the bottommost level', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await fillKeys(db, 2000)
+  await db.compactRange()
+
+  const before = await sstSize(db)
+  t.ok(before > 0, 'data on disk')
+
+  // the snapshot pins the deleted keys, so they survive into the bottommost
+  // level together with their tombstone
+  const snapshot = db.snapshot()
+
+  await db.deleteRange(compactionKey(0), compactionKey(2000))
+  await db.flush()
+  await db.compactRange(compactionKey(0), compactionKey(2000))
+
+  await snapshot.close()
+
+  await db.compactRange(compactionKey(0), compactionKey(2000))
+  t.ok((await sstSize(db)) > 0, 'bottommost level is left alone by default')
+
+  await db.compactRange(compactionKey(0), compactionKey(2000), { reclaim: true })
+  t.is(await sstSize(db), 0, 'reclaim rewrote the bottommost level')
+
+  await db.close()
+})
+
+test('manual compaction, an explicit bottommost level wins over reclaim', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  await fillKeys(db, 2000)
+  await db.compactRange()
+
+  const snapshot = db.snapshot()
+
+  await db.deleteRange(compactionKey(0), compactionKey(2000))
+  await db.flush()
+  await db.compactRange(compactionKey(0), compactionKey(2000))
+
+  await snapshot.close()
+
+  await db.compactRange(compactionKey(0), compactionKey(2000), {
+    reclaim: true,
+    bottommostLevelCompaction: RocksDB.constants.bottommostLevelCompaction.SKIP
+  })
+
+  t.ok((await sstSize(db)) > 0, 'the explicit skip is honoured')
+
+  await db.close()
+})
+
+test('manual compaction, reclaim collects dead blobs', async (t) => {
+  const db = await fillBlobs(t)
+
+  const before = await blobSize(db)
+  t.ok(before > 0, 'blobs on disk')
+
+  await db.deleteRange(compactionKey(0), compactionKey(1000))
+  await db.flush()
+
+  await db.compactRange(compactionKey(0), compactionKey(2000))
+  const collected = await blobSize(db)
+  t.ok(collected < before, 'some blobs are collected by default')
+
+  await db.compactRange(compactionKey(0), compactionKey(2000), { reclaim: true })
+  t.ok((await blobSize(db)) < collected, 'reclaim collects the blobs left behind')
+
+  await db.close()
+})
+
+test('manual compaction, explicit blob options win over reclaim', async (t) => {
+  const overrides = [
+    ['policy', { blobGarbageCollectionPolicy: RocksDB.constants.garbageCollectionPolicy.DISABLE }],
+    ['age cutoff', { blobGarbageCollectionAgeCutoff: 0 }]
+  ]
+
+  for (const [name, override] of overrides) {
+    const db = await deadBlobs(t)
+    const before = await blobSize(db)
+
+    await db.compactRange(compactionKey(0), compactionKey(2000), {
+      reclaim: true,
+      ...override
+    })
+
+    t.is(await blobSize(db), before, `the explicit ${name} is honoured`)
+
+    await db.close()
+  }
+
+  // the same compaction without an override does collect, so the assertions
+  // above are not just observing a compaction that had nothing to do
+  const db = await deadBlobs(t)
+  const before = await blobSize(db)
+
+  await db.compactRange(compactionKey(0), compactionKey(2000), { reclaim: true })
+  t.ok((await blobSize(db)) < before, 'reclaim collects without an override')
+
+  await db.close()
+})
+
+function compactionKey(n) {
+  return 'k' + n.toString().padStart(5, '0')
+}
+
+async function fillBlobs(t) {
+  const columnFamily = new RocksDB.ColumnFamily('default', {
+    enableBlobFiles: true,
+    minBlobSize: 512,
+    blobFileSize: 1024 * 1024,
+    enableBlobGarbageCollection: true
+  })
+
+  const db = new RocksDB(await t.tmp(), { columnFamily })
+  await db.ready()
+
+  await fillKeys(db, 2000, 4096)
+  await db.compactRange()
+
+  return db
+}
+
+// blobs that a regular compaction leaves behind, as its garbage collection
+// thresholds are not met
+async function deadBlobs(t) {
+  const db = await fillBlobs(t)
+
+  await db.deleteRange(compactionKey(0), compactionKey(1000))
+  await db.flush()
+  await db.compactRange(compactionKey(0), compactionKey(2000))
+
+  return db
+}
+
+async function fillKeys(db, n, size = 1024) {
+  const batch = db.write()
+  for (let i = 0; i < n; i++) batch.tryPut(compactionKey(i), Buffer.alloc(size, i % 251))
+  await batch.flush()
+  batch.destroy()
+  await db.flush()
+}
+
+async function sstSize(db) {
+  return Number(await db.getProperty('rocksdb.total-sst-files-size'))
+}
+
+async function blobSize(db) {
+  return Number(await db.getProperty('rocksdb.total-blob-file-size'))
+}
+
 function noop() {}
 
 // A call that settles before resume got past the suspend
