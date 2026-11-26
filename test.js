@@ -1909,7 +1909,7 @@ test('manual compaction, reclaim rewrites the bottommost level', async (t) => {
   await snapshot.close()
 
   await db.compactRange(compactionKey(0), compactionKey(2000))
-  t.ok(await sstSize(db) > 0, 'bottommost level is left alone by default')
+  t.ok((await sstSize(db)) > 0, 'bottommost level is left alone by default')
 
   await db.compactRange(compactionKey(0), compactionKey(2000), { reclaim: true })
   t.is(await sstSize(db), 0, 'reclaim rewrote the bottommost level')
@@ -1937,7 +1937,7 @@ test('manual compaction, explicit options win over reclaim', async (t) => {
     bottommostLevelCompaction: RocksDB.constants.bottommostLevelCompaction.SKIP
   })
 
-  t.ok(await sstSize(db) > 0, 'the explicit skip is honoured')
+  t.ok((await sstSize(db)) > 0, 'the explicit skip is honoured')
 
   await db.close()
 })
@@ -1967,7 +1967,7 @@ test('manual compaction, reclaim collects dead blobs', async (t) => {
   t.ok(collected < before, 'some blobs are collected by default')
 
   await db.compactRange(compactionKey(0), compactionKey(2000), { reclaim: true })
-  t.ok(await blobSize(db) < collected, 'reclaim collects the blobs left behind')
+  t.ok((await blobSize(db)) < collected, 'reclaim collects the blobs left behind')
 
   await db.close()
 })
