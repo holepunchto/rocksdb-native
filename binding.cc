@@ -446,7 +446,8 @@ rocksdb_native_init(
   uint64_t wal_ttl_seconds,
   uint64_t wal_size_limit_mb,
   bool avoid_flush_during_shutdown,
-  js_array_t wal_filter_prefixes_array
+  js_array_t wal_filter_prefixes_array,
+  uint64_t block_cache_size
 ) {
   int err;
 
@@ -491,7 +492,7 @@ rocksdb_native_init(
   new (&db->column_families) std::set<rocksdb_native_column_family_t *>();
   new (&db->snapshots) std::set<rocksdb_native_snapshot_t *>();
 
-  rocksdb_options_init(&db->options, 8);
+  rocksdb_options_init(&db->options, 9);
 
   db->options.read_only = read_only;
   db->options.create_if_missing = create_if_missing;
@@ -514,6 +515,7 @@ rocksdb_native_init(
   db->options.avoid_flush_during_shutdown = avoid_flush_during_shutdown;
   db->options.wal_filter_prefixes = db->wal_filter_prefixes;
   db->options.wal_filter_prefixes_len = db->wal_filter_prefixes_len;
+  db->options.block_cache_size = block_cache_size;
 
   return handle;
 }

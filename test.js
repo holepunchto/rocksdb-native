@@ -2079,6 +2079,138 @@ async function blobSize(db) {
   return Number(await db.getProperty('rocksdb.total-blob-file-size'))
 }
 
+test('block cache size', async (t) => {
+  const db = new RocksDB(await t.tmp(), { blockCacheSize: 4 * 1024 * 1024 })
+  await db.ready()
+
+  t.is(await db.getProperty('rocksdb.block-cache-capacity'), '4194304')
+
+  await db.close()
+})
+
+test('block cache is shared between column families', async (t) => {
+  const db = new RocksDB(await t.tmp(), {
+    blockCacheSize: 4 * 1024 * 1024,
+    columnFamilies: ['a', 'b']
+  })
+
+  const a = db.columnFamily('a')
+  const b = db.columnFamily('b')
+
+  await db.ready()
+
+  t.is(await a.getProperty('rocksdb.block-cache-capacity'), '4194304')
+  t.is(await b.getProperty('rocksdb.block-cache-capacity'), '4194304')
+
+  // reading through one family populates the cache the other one sees
+  await a.put('hello', 'world')
+  await a.flush()
+  t.alike(await a.get('hello'), Buffer.from('world'))
+
+  t.ok(Number(await b.getProperty('rocksdb.block-cache-usage')) > 0)
+
+  await a.close()
+  await b.close()
+  await db.close()
+})
+
+test('block cache size is not set by default', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  // RocksDB's own default, which is per column family rather than shared
+  t.not(await db.getProperty('rocksdb.block-cache-capacity'), '0')
+
+  await db.close()
+})
+
+test('profile applies to the default column family', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile' })
+  await db.ready()
+
+  const options = db.defaultColumnFamily._options
+  t.is(options.writeBufferSize, 16 * 1024 * 1024)
+  t.is(options.optimizeFiltersForMemory, true)
+  t.is(options.filterPolicy.type, 2) // Ribbon
+
+  await db.close()
+})
+
+test('explicit options win over the profile', async (t) => {
+  const db = new RocksDB(await t.tmp(), {
+    profile: 'mobile',
+    writeBufferSize: 1024 * 1024
+  })
+  await db.ready()
+
+  const options = db.defaultColumnFamily._options
+  t.is(options.writeBufferSize, 1024 * 1024)
+  t.is(options.optimizeFiltersForMemory, true)
+
+  await db.close()
+})
+
+test('unknown profile throws', async (t) => {
+  t.exception(() => new RocksDB('.', { profile: 'toaster' }), /Unknown RocksDB profile/)
+})
+
+test('profile applies to a standalone column family', async (t) => {
+  const col = new RocksDB.ColumnFamily('tuned', { profile: 'mirror' })
+  t.is(col._options.writeBufferSize, 128 * 1024 * 1024)
+  t.is(col._options.maxWriteBufferNumber, 4)
+  t.is(col._options.filterPolicy.bloomBeforeLevel, 2)
+
+  const db = new RocksDB(await t.tmp(), { columnFamilies: [col] })
+  await db.ready()
+  await db.close()
+})
+
+test('column families created by name inherit the profile', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile' })
+  const session = db.columnFamily('extra')
+  await db.ready()
+
+  t.is(session._columnFamily._options.writeBufferSize, 16 * 1024 * 1024)
+
+  await session.close()
+  await db.close()
+})
+
+test('profiles bound the block cache', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile', columnFamilies: ['a', 'b'] })
+
+  const a = db.columnFamily('a')
+  const b = db.columnFamily('b')
+
+  await db.ready()
+
+  // one cache for the database, not one per column family
+  t.is(await a.getProperty('rocksdb.block-cache-capacity'), '8388608')
+  t.is(await b.getProperty('rocksdb.block-cache-capacity'), '8388608')
+
+  await a.close()
+  await b.close()
+  await db.close()
+})
+
+test('an explicit block cache size wins over the profile', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile', blockCacheSize: 2 * 1024 * 1024 })
+  await db.ready()
+
+  t.is(await db.getProperty('rocksdb.block-cache-capacity'), '2097152')
+
+  await db.close()
+})
+
+test('open + write + read with each profile', async (t) => {
+  for (const profile of Object.keys(RocksDB.profiles)) {
+    const db = new RocksDB(await t.tmp(), { profile })
+    await db.put('hello', 'world')
+    t.alike(await db.get('hello'), Buffer.from('world'), profile)
+    await db.close()
+  }
+})
+
 function noop() {}
 
 // A call that settles before resume got past the suspend
