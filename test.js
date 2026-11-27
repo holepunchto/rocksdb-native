@@ -2176,6 +2176,32 @@ test('column families created by name inherit the profile', async (t) => {
   await db.close()
 })
 
+test('profiles bound the block cache', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile', columnFamilies: ['a', 'b'] })
+
+  const a = db.columnFamily('a')
+  const b = db.columnFamily('b')
+
+  await db.ready()
+
+  // one cache for the database, not one per column family
+  t.is(await a.getProperty('rocksdb.block-cache-capacity'), '8388608')
+  t.is(await b.getProperty('rocksdb.block-cache-capacity'), '8388608')
+
+  await a.close()
+  await b.close()
+  await db.close()
+})
+
+test('an explicit block cache size wins over the profile', async (t) => {
+  const db = new RocksDB(await t.tmp(), { profile: 'mobile', blockCacheSize: 2 * 1024 * 1024 })
+  await db.ready()
+
+  t.is(await db.getProperty('rocksdb.block-cache-capacity'), '2097152')
+
+  await db.close()
+})
+
 test('open + write + read with each profile', async (t) => {
   for (const profile of Object.keys(RocksDB.profiles)) {
     const db = new RocksDB(await t.tmp(), { profile })

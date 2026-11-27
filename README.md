@@ -32,17 +32,10 @@ Pass `profile` to get defaults tuned for an environment. Any option you pass exp
 const db = new RocksDB('./example.db', { profile: 'mobile' })
 ```
 
-- `desktop` — the library defaults, named so callers can be explicit.
-- `mobile` — memory and fd constrained devices: small write buffers (16 MiB),
-  fewer background jobs, bounded open files, Ribbon filters and
-  memory-optimized filter allocation.
-- `mirror` — long-running servers replicating many cores (e.g. blind mirrors):
-  large write buffers (128 MiB x 4), more compaction parallelism, Ribbon
-  filters below the write-hot levels.
-- `ephemeral` — short-lived minimal-footprint opens (e.g. a notification
-  extension peeking at the DB): no block cache, no filters, direct reads,
-  a single open file. Pair with `readOnly: true` (and `walFilterPrefixes`
-  where applicable).
+- `desktop` — the library defaults, named so callers can be explicit. Note that this leaves every column family with its own block cache of RocksDB's default size, so the total is unbounded.
+- `mobile` — memory and fd constrained devices: an 8 MiB block cache for the whole database, small write buffers (16 MiB), fewer background jobs, bounded open files, Ribbon filters and memory-optimized filter allocation.
+- `mirror` — long-running servers replicating many cores (e.g. blind mirrors): a 256 MiB block cache, large write buffers (128 MiB x 4), more compaction parallelism, Ribbon filters below the write-hot levels.
+- `ephemeral` — short-lived minimal-footprint opens (e.g. a notification extension peeking at the DB): no block cache, no filters, direct reads, a single open file. Pair with `readOnly: true` (and `walFilterPrefixes` where applicable).
 
 The presets are exported as `RocksDB.profiles`. A profile applies to both DB-level options and column-family options, including column families created by name and standalone `new RocksDB.ColumnFamily(name, { profile })`.
 
