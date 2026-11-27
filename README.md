@@ -37,6 +37,18 @@ By default a compaction leaves the bottommost level alone and only collects blob
 
 The underlying `bottommostLevelCompaction`, `blobGarbageCollectionPolicy` and `blobGarbageCollectionAgeCutoff` options remain available and take precedence over `reclaim` when passed explicitly.
 
+## Block cache
+
+`blockCacheSize` bounds the memory the database spends caching blocks, index and filter data:
+
+```js
+const db = new RocksDB('./example.db', { blockCacheSize: 8 * 1024 * 1024 })
+```
+
+One cache of that size is created when the database opens and shared by every column family, so the number tells you the total. Without it each column family gets its own cache of RocksDB's default size, which cannot be bounded and grows with the number of column families.
+
+Column families that set `blockCache: false` keep their own setting and stay out of the shared cache. Note that disabling the cache also requires `tableCacheIndexAndFilterBlocks: false`, as index and filter blocks have nowhere else to live.
+
 ## License
 
 Apache-2.0

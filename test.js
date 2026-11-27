@@ -2079,6 +2079,51 @@ async function blobSize(db) {
   return Number(await db.getProperty('rocksdb.total-blob-file-size'))
 }
 
+test('block cache size', async (t) => {
+  const db = new RocksDB(await t.tmp(), { blockCacheSize: 4 * 1024 * 1024 })
+  await db.ready()
+
+  t.is(await db.getProperty('rocksdb.block-cache-capacity'), '4194304')
+
+  await db.close()
+})
+
+test('block cache is shared between column families', async (t) => {
+  const db = new RocksDB(await t.tmp(), {
+    blockCacheSize: 4 * 1024 * 1024,
+    columnFamilies: ['a', 'b']
+  })
+
+  const a = db.columnFamily('a')
+  const b = db.columnFamily('b')
+
+  await db.ready()
+
+  t.is(await a.getProperty('rocksdb.block-cache-capacity'), '4194304')
+  t.is(await b.getProperty('rocksdb.block-cache-capacity'), '4194304')
+
+  // reading through one family populates the cache the other one sees
+  await a.put('hello', 'world')
+  await a.flush()
+  t.alike(await a.get('hello'), Buffer.from('world'))
+
+  t.ok(Number(await b.getProperty('rocksdb.block-cache-usage')) > 0)
+
+  await a.close()
+  await b.close()
+  await db.close()
+})
+
+test('block cache size is not set by default', async (t) => {
+  const db = new RocksDB(await t.tmp())
+  await db.ready()
+
+  // RocksDB's own default, which is per column family rather than shared
+  t.not(await db.getProperty('rocksdb.block-cache-capacity'), '0')
+
+  await db.close()
+})
+
 function noop() {}
 
 // A call that settles before resume got past the suspend
